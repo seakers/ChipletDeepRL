@@ -11,7 +11,7 @@ from cascade_run import runSingleCascade
 from utils.hypervolume_utils import is_pareto_efficient
 from transformer_architecture import Actor, Critic
 
-def run_ppo_optimization(max_objectives, params):
+def run_ppo_optimization(max_objectives, params, eval_function):
     """
     Run the PPO optimization for the given number of components and objectives.
     """
@@ -24,14 +24,16 @@ def run_ppo_optimization(max_objectives, params):
 
     epochs = params['num_epochs']
     date_str = params['date_str']
-    num_actions = params['num_comp_types'] - 1
-    num_objectives = params['num_objectives']
+    des_space = eval_function.design_space
+    num_actions = len(des_space)
+    num_objectives = 2
 
-    actor, critic = get_models(num_actions, device, params)
+    actor, critic = get_models(num_actions, device, params, des_space)
 
     NFE = 0
     all_des = []
     all_obj = []
+    all_constraints = []
     all_actor_loss = []
     all_critic_loss = []
     all_avg_obj = []
@@ -39,9 +41,9 @@ def run_ppo_optimization(max_objectives, params):
 
     for epoch in range(epochs):
         print(f"Epoch {epoch + 1}/{epochs}")
-        actor, critic, NFE, all_des, all_obj, avg_obj, critic_loss, actor_loss, kl = run_epoch(
+        actor, critic, NFE, all_des, all_obj, all_constraints, avg_obj, critic_loss, actor_loss, kl = run_epoch(
             actor, critic, num_actions, NFE, max_objectives,
-            all_des, all_obj, device, params
+            all_des, all_obj, all_constraints, device, params, eval_function
         )
         all_actor_loss.append(actor_loss)
         all_critic_loss.append(critic_loss)
@@ -50,6 +52,8 @@ def run_ppo_optimization(max_objectives, params):
 
     all_des = np.array(all_des)
     all_obj = np.array(all_obj)
+    all_constraints = np.array(all_constraints)
+    all_obj[all_constraints > 0] = max_objectives
 
     norm_obj = all_obj / max_objectives
 
@@ -91,7 +95,7 @@ def run_ppo_optimization(max_objectives, params):
     plt.legend()
 
     plt.subplot(1, 3, 3)
-    plt.plot(range(epochs), all_avg_obj, label='KL Divergence', color='green')
+    plt.plot(range(epochs), all_kl, label='KL Divergence', color='green')
     plt.xlabel('Epochs')
     plt.ylabel('KL Divergence')
     plt.title('KL Divergence vs Epochs')
@@ -104,17 +108,22 @@ def run_ppo_optimization(max_objectives, params):
     # return actor, critic, NFE, all_des, all_obj
     return all_des, all_obj, pareto_front_des, pareto_front_obj, hypervolumes, NFE
 
-def get_models(num_actions, device, params):
-    actor = Actor(device=device, params=params)
+def get_models(num_actions, device, params, des_space):
+    actor = Actor(device=device, params=params, des_space=des_space)
     critic = Critic(device=device, params=params)
 
     actor.to(device)
     critic.to(device)
 
+    if params['model_folder'] is not None:
+        actor.load_state_dict(torch.load(f"{params['model_folder']}/actor_model.pth"))
+        critic.load_state_dict(torch.load(f"{params['model_folder']}/critic_model.pth"))
+        print("Loaded pre-trained models.")
+
     input = torch.zeros((1, num_actions), dtype=torch.float32).to(device)
     # input_critic = torch.zeros((1, num_actions, 1), dtype=torch.float32).to(device)
 
-    actor(input)
+    actor(input, 0)
     critic(input)
 
     return actor, critic
@@ -124,14 +133,16 @@ def discounted_cumulative_sums(x, discount):
     return scipy.signal.lfilter([1], [1, float(-discount)], x[::-1], axis=0)[::-1]
 
 
-def run_epoch(actor, critic, num_actions, NFE, max_obj, all_des, all_obj, device, params):
+def run_epoch(actor, critic, num_actions, NFE, max_obj, all_des, all_obj, all_constraints, device, params, eval_function):
 
     mini_batch_size = params['mini_batch_size']
     num_objs = len(max_obj)
+    des_space = eval_function.design_space
 
     rewards = [[] for x in range(mini_batch_size)]
     actions = [[] for x in range(mini_batch_size)]
     logprobs = [[] for x in range(mini_batch_size)]
+    designs = [[] for x in range(mini_batch_size)]
 
     observation = [[] for x in range(mini_batch_size)]
 
@@ -141,7 +152,7 @@ def run_epoch(actor, critic, num_actions, NFE, max_obj, all_des, all_obj, device
 
     # sample actor
     for i in range(num_actions):
-        log_probs, sel_actions = actor.sample_action(observation)
+        log_probs, sel_actions = actor.sample_action(observation, i)
         log_probs = log_probs.tolist()
         sel_actions = sel_actions.tolist()
 
@@ -150,16 +161,28 @@ def run_epoch(actor, critic, num_actions, NFE, max_obj, all_des, all_obj, device
             logprobs[idx].append(log_probs[idx])
             observation[idx].append(action)
             rewards[idx].append(0.)
+            if des_space[i]['type'] == 'continuous':
+                des_val = action * (des_space[i]['range'][1] - des_space[i]['range'][0]) + des_space[i]['range'][0]
+                designs[idx].append(des_val)
+            elif des_space[i]['type'] == 'discrete':
+                des_val = des_space[i]['range'][int(action)]
+                designs[idx].append(des_val)
+            else:
+                print("INVALID DESIGN SPACE")
 
     # get objective values
     objectives = []
-    for idx, act in enumerate(actions):
-        obj_values = runSingleCascade(params, act)
+    for idx, des in enumerate(designs):
+        obj_values = eval_function.evaluate(des)
         NFE += 1
-        all_des.append(act)
-        all_obj.append(list(obj_values))
-        objectives.append(obj_values)
-        rewards[idx][-1] = rewards[idx][-1] + np.dot(weights[idx], -np.array(obj_values))
+        all_des.append(des)
+        all_obj.append(obj_values[:2])
+        all_constraints.append(obj_values[2])
+        objectives.append(obj_values[:2])
+        if obj_values[2] > 0:
+            rewards[idx][-1] = rewards[idx][-1] + np.dot(weights[idx], -np.ones_like(np.array(max_obj)))
+        else:
+            rewards[idx][-1] = rewards[idx][-1] + np.dot(weights[idx], -np.array(obj_values[:2])/np.array(max_obj))
 
     # sample critic
     critic_values = []
@@ -252,6 +275,7 @@ def run_epoch(actor, critic, num_actions, NFE, max_obj, all_des, all_obj, device
         )
 
     avg_obj = np.mean(objectives, axis=0)
-    print(f"Actor Loss: {actor_loss:.4f}, \nCritic Loss: {critic_loss:.4f}, \nKL: {kl:.4f}, \nAvg Objectives: {avg_obj}\n")
+    # print(f"Actor Loss: {actor_loss:.4f}, \nCritic Loss: {critic_loss:.4f}, \nKL: {kl:.4f}, \nAvg Objectives: {avg_obj}\n")
+    print(f"Avg Objectives: {avg_obj}")
 
-    return actor, critic, NFE, all_des, all_obj, avg_obj, critic_loss, actor_loss, kl
+    return actor, critic, NFE, all_des, all_obj, all_constraints, avg_obj, critic_loss, actor_loss, kl

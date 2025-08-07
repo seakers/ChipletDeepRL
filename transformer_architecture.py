@@ -68,16 +68,16 @@ class PositionalEncoding(nn.Module):
         return self.dropout(x)
     
 class Actor(nn.Module):
-    def __init__(self, device, params):
+    def __init__(self, device, params, des_space):
         super(Actor, self).__init__()
         self.device = device
         self.params = params
+        self.des_space = des_space
 
         self.nhead = 2
         self.dense_dim = 16
         self.scaler = GradScaler()
         self.clip_ratio = params['clip_ratio']
-        self.num_actions = params['num_components'] + 1
         
         self.encoder = nn.Linear(1, self.dense_dim)
         self.positional_encoding = PositionalEncoding(self.dense_dim)
@@ -87,7 +87,16 @@ class Actor(nn.Module):
             dim_feedforward=self.dense_dim,
             dropout=0.1
         )
-        self.output_layer = nn.Linear(self.dense_dim, self.num_actions)
+        # self.output_layer = nn.Linear(self.dense_dim, self.num_actions)
+        self.output_layers = nn.ModuleList()
+        for var in des_space:
+            if var['type'] == 'continuous':
+                self.output_layers.append(nn.Linear(self.dense_dim, 2))
+            elif var['type'] == 'discrete':
+                self.output_layers.append(nn.Linear(self.dense_dim, len(var['range'])))
+            else:
+                print("INVALID DESIGN SPACE")
+
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=params['learning_rate'])
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=1000, gamma=0.9)
@@ -99,43 +108,73 @@ class Actor(nn.Module):
     
     # def repair_designs(self, actions)
     
-    def forward(self, x):
+    def forward(self, x, ind):
         with autocast(device_type=self.device.type, dtype=torch.float16):
             x = x.unsqueeze(-1)
             x = self.encoder(x)
             x = self.positional_encoding(x)
             mask = self.generate_square_subsequent_mask(x.size(1)).to(self.device) # x.size(1) is the sequence length
             x = self.transformer_decoder(x, tgt_mask=mask)
-            x = self.output_layer(x)
-            x = F.softmax(x, dim=-1)
+            x = self.output_layers[ind](x)
+            if self.des_space[ind]['type'] == 'continuous':
+                x = torch.exp(x)
+            elif self.des_space[ind]['type'] == 'discrete':
+                x = F.softmax(x, dim=-1)
+            else:
+                print("INVALID DESIGN SPACE")
 
         return x
     
-    def sample_action(self, observation):
+    def sample_action(self, observation, ind):
         if len(observation[0]) == 0:
             observation = [[0] for x in range(len(observation))]
         input_observation = torch.tensor(observation, dtype=torch.float32).to(self.device)
-        output = self.forward(input_observation)
+        output = self.forward(input_observation, ind)
         output_last = output[:, -1, :]
 
-        log_probs = torch.log(output_last + 1e-10)
-        samples = torch.distributions.categorical.Categorical(logits=log_probs).sample()
-        action_ids = samples.squeeze()
-        action_probs = log_probs.gather(1, action_ids.unsqueeze(-1)).squeeze()
+        if self.des_space[ind]['type'] == 'continuous':
+            alpha = output_last[:, 0].squeeze()
+            beta = output_last[:, 1].squeeze()
+            action_dist = torch.distributions.Beta(alpha, beta)
+            action_ids = action_dist.sample().squeeze()
+            action_probs = action_dist.log_prob(action_ids)
+        elif self.des_space[ind]['type'] == 'discrete':
+            log_probs = torch.log(output_last + 1e-10)
+            samples = torch.distributions.categorical.Categorical(logits=log_probs).sample()
+            action_ids = samples.squeeze()
+            action_probs = log_probs.gather(1, action_ids.unsqueeze(-1)).squeeze()
+
         return action_probs, action_ids
     
     def ppo_update(self, observation, action, logprob, advantage):
         self.optimizer.zero_grad()
         with autocast(device_type=self.device.type, dtype=torch.float16):
-            new_pred_probs = self(observation)[:, -1, :]
-            new_pred_logprobs = torch.log(new_pred_probs + 1e-10)
-            new_logprobs = torch.sum(
-                torch.mul(F.one_hot(action.long(), num_classes=self.num_actions), new_pred_logprobs),
-                dim=-1
-            )
+            num_vars = observation.size(1)
+            new_log_probs = torch.zeros_like(action, dtype=torch.float32).to(self.device)
+            for i in range(num_vars):
+                var_mask = torch.zeros((observation.size(0)), dtype=torch.bool, device=self.device)
+                var_mask[i::num_vars] = True
+                var_observation = observation[var_mask]
+                var_action = action[var_mask]
+                # need to separate discrete and continuous to calculate logprobs
+                if self.des_space[i]['type'] == 'continuous':
+                    params = self.forward(var_observation, i)
+                    alpha = params[:,-1,0].squeeze()
+                    beta = params[:,-1,1].squeeze()
+                    action_dist = torch.distributions.Beta(alpha, beta)
+                    var_new_logprobs = action_dist.log_prob(var_action)
+                elif self.des_space[i]['type'] == 'discrete':
+                    pred_probs = self.forward(var_observation, i)[:,-1,:]
+                    log_probs = torch.log(pred_probs + 1e-10)
+                    var_new_logprobs = torch.sum(torch.mul(F.one_hot(var_action.long(), num_classes=len(self.des_space[i]['range'])), log_probs), dim=-1)
+                else:
+                    print("INVALID DESIGN SPACE")
 
+                new_log_probs[var_mask] = var_new_logprobs
 
-            ratio = torch.exp(new_logprobs - logprob)
+            new_log_probs = new_log_probs.view(-1)
+
+            ratio = torch.exp(new_log_probs - logprob)
             min_advantage = torch.where(
                 advantage > 0,
                 (1 + self.clip_ratio) * advantage,
@@ -148,7 +187,7 @@ class Actor(nn.Module):
         self.scaler.update()
         self.scheduler.step()
 
-        kl = torch.mean(new_logprobs - logprob)
+        kl = torch.mean(new_log_probs - logprob)
 
         return policy_loss.item(), kl.item()
     
@@ -163,7 +202,7 @@ class Critic(nn.Module):
         self.dense_dim = 16
         self.scaler = GradScaler()
         self.clip_ratio = params['clip_ratio']
-        self.num_objectives = params['num_objectives']
+        self.num_objectives = 2
         
         self.encoder = nn.Linear(1, self.dense_dim)
         self.positional_encoding = PositionalEncoding(self.dense_dim)
