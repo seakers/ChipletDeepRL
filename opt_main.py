@@ -8,8 +8,7 @@ import pickle
 from ppo_optimization import run_ppo_optimization
 from random_search import run_random_search
 from genetic_algorithm import run_genetic_algorithm
-from utils.design_utils import design_to_chiplet_values
-from evaluation import Speed_Reducer_Design
+from utils.evaluation import Speed_Reducer_Design
 
 def main():
 
