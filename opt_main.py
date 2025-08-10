@@ -15,11 +15,11 @@ from utils.visualization import config_visualization
 
 def main():
 
-    num_runs = 1
+    num_runs = 20
 
     params = {
         'num_epochs': 750,
-        'mini_batch_size': 32,
+        'mini_batch_size': 64,
         'gamma': 0.999,
         'lambda': 0.95,
         'learning_rate': 0.0001,
