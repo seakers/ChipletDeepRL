@@ -27,10 +27,11 @@ class Component:
     Used for Attitude Controllers:
     momentum Nms
     """     
-    def __init__(self, type, mass=None, dimensions=None, **kwargs):
+    def __init__(self, type, mass=None, dimensions=None, in_out='in', **kwargs):
         self.type = type
         self.mass = mass # kg
         self.dimensions = dimensions # m
+        self.in_out = in_out
 
         # get the optional arguments which can differ between components
         for k in kwargs.keys():
@@ -46,7 +47,7 @@ class StructPanel:
     orientation [rad,rad,rad]: list of three values
     density kg*m^-3: float, aluminum by default (2710)
     """
-    def __init__(self, dimensions=[1,1], location=[0,0,0], orientation=np.matrix([[1,0,0],[0,1,0],[0,0,1]]), density=2710., **kwargs):
+    def __init__(self, dimensions=[1,1], location=[0,0,0], orientation=np.array([[1,0,0],[0,1,0],[0,0,1]]), density=2710., **kwargs):
         self.location = location
         self.orientation = orientation
         self.dimensions = dimensions

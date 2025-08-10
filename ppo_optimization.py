@@ -5,16 +5,17 @@ from torch.nn import functional as F
 import scipy.signal
 import time
 import matplotlib.pyplot as plt
-from pymoo.indicators.hv import HV
 
-from cascade_run import runSingleCascade
-from utils.hypervolume_utils import is_pareto_efficient
+from utils.hypervolume_utils import HypervolumeGrid
 from transformer_architecture import Actor, Critic
 
+
 def run_ppo_optimization(max_objectives, params, eval_function):
+
     """
     Run the PPO optimization for the given number of components and objectives.
     """
+    print("\n\nRunning PPO Optimization...\n\n")
     if torch.cuda.is_available():
         device = torch.device("cuda:0")
         torch.cuda.set_device(0)
@@ -25,10 +26,11 @@ def run_ppo_optimization(max_objectives, params, eval_function):
     epochs = params['num_epochs']
     date_str = params['date_str']
     des_space = eval_function.design_space
+    unique_des_space = eval_function.unique_des_space
     num_actions = len(des_space)
-    num_objectives = 2
+    num_objectives = eval_function.num_objectives
 
-    actor, critic = get_models(num_actions, device, params, des_space)
+    actor, critic = get_models(num_actions, device, params, unique_des_space, num_objectives, eval_function.component_list)
 
     NFE = 0
     all_des = []
@@ -38,6 +40,7 @@ def run_ppo_optimization(max_objectives, params, eval_function):
     all_critic_loss = []
     all_avg_obj = []
     all_kl = []
+    hv_grid = HypervolumeGrid(refPoint=[1.0]*num_objectives)
 
     for epoch in range(epochs):
         print(f"Epoch {epoch + 1}/{epochs}")
@@ -53,7 +56,8 @@ def run_ppo_optimization(max_objectives, params, eval_function):
     all_des = np.array(all_des)
     all_obj = np.array(all_obj)
     all_constraints = np.array(all_constraints)
-    all_obj[all_constraints > 0] = max_objectives
+    all_obj[all_constraints] = max_objectives
+    print(f"Number of valid designs (False in all_constraints): {np.sum(all_constraints == False)}")
 
     norm_obj = all_obj / max_objectives
 
@@ -64,15 +68,14 @@ def run_ppo_optimization(max_objectives, params, eval_function):
     hypervolumes = []
 
     for obj in range(NFE):
-        temp_norm_obj = norm_obj[:obj + 1]
-        temp_all_des = all_des[:obj + 1]
-        temp_all_obj = all_obj[:obj + 1]
-        pareto_mask = is_pareto_efficient(temp_norm_obj, return_mask=True)
-        pareto_front_des.append(temp_all_des[pareto_mask])
-        pareto_front_obj.append(temp_all_obj[pareto_mask])
-
-        hypervolume_indicator = HV(ref_point=ref_point)
-        hypervolumes.append(hypervolume_indicator(temp_norm_obj[pareto_mask]))
+        hv_grid.updateHV(norm_obj[obj], all_des[obj])
+        hypervolumes.append(hv_grid.getHV())
+        pareto_front_obj.append(hv_grid.paretoFrontPoint)
+        pareto_front_des.append(hv_grid.paretoFrontSolution)
+        # if (len(hypervolumes) > 1 and hypervolumes[-2] < hypervolumes[-1]) or len(hypervolumes) == 1:
+        #     print(f"New max HV found: {hv_grid.getHV()} at NFE {obj+1}")
+        #     print(f"Pareto front objectives:\n{hv_grid.paretoFrontPoint}" + \
+        #           f"\nCorresponding designs:\n{hv_grid.paretoFrontSolution}")
 
     torch.save(actor.state_dict(), f'results/{date_str}/actor_model.pth')
     torch.save(critic.state_dict(), f'results/{date_str}/critic_model.pth')
@@ -108,9 +111,11 @@ def run_ppo_optimization(max_objectives, params, eval_function):
     # return actor, critic, NFE, all_des, all_obj
     return all_des, all_obj, pareto_front_des, pareto_front_obj, hypervolumes, NFE
 
-def get_models(num_actions, device, params, des_space):
-    actor = Actor(device=device, params=params, des_space=des_space)
-    critic = Critic(device=device, params=params)
+
+def get_models(num_actions, device, params, unique_des_space, num_objectives, comp_list):
+
+    actor = Actor(device=device, params=params, des_space=unique_des_space, comp_list=comp_list)
+    critic = Critic(device=device, params=params, num_objectives=num_objectives)
 
     actor.to(device)
     critic.to(device)
@@ -130,6 +135,7 @@ def get_models(num_actions, device, params, des_space):
 
 
 def discounted_cumulative_sums(x, discount):
+
     return scipy.signal.lfilter([1], [1, float(-discount)], x[::-1], axis=0)[::-1]
 
 
@@ -173,16 +179,17 @@ def run_epoch(actor, critic, num_actions, NFE, max_obj, all_des, all_obj, all_co
     # get objective values
     objectives = []
     for idx, des in enumerate(designs):
-        obj_values = eval_function.evaluate(des)
+        obj_values, constraints = eval_function.evaluate(des)
         NFE += 1
         all_des.append(des)
-        all_obj.append(obj_values[:2])
-        all_constraints.append(obj_values[2])
-        objectives.append(obj_values[:2])
-        if obj_values[2] > 0:
+        all_obj.append(obj_values)
+        all_constraints.append(constraints)
+        objectives.append(obj_values)
+        if constraints:
             rewards[idx][-1] = rewards[idx][-1] + np.dot(weights[idx], -np.ones_like(np.array(max_obj)))
         else:
-            rewards[idx][-1] = rewards[idx][-1] + np.dot(weights[idx], -np.array(obj_values[:2])/np.array(max_obj))
+            # print(f"Found a valid design! Genetic Algorithm: Design: {des}, Objectives: {objectives}")
+            rewards[idx][-1] = rewards[idx][-1] + np.dot(weights[idx], -np.array(obj_values)/np.array(max_obj))
 
     # sample critic
     critic_values = []
@@ -251,7 +258,7 @@ def run_epoch(actor, critic, num_actions, NFE, max_obj, all_des, all_obj, all_co
     logprob_tensor = torch.tensor(logprob_tensor, dtype=torch.float32).to(device)
     advantage_tensor = torch.tensor(advantage_tensor, dtype=torch.float32).to(device)
     return_tensor = torch.tensor(return_tensor, dtype=torch.float32).to(device)
-    weights_tensor = torch.tensor(weights_tensor, dtype=torch.float32).to(device)
+    weights_tensor = torch.tensor(np.array(weights_tensor), dtype=torch.float32).to(device)
 
     targetkl = params['target_kl']
     actor_iterations = params['update_iterations']
@@ -276,6 +283,6 @@ def run_epoch(actor, critic, num_actions, NFE, max_obj, all_des, all_obj, all_co
 
     avg_obj = np.mean(objectives, axis=0)
     # print(f"Actor Loss: {actor_loss:.4f}, \nCritic Loss: {critic_loss:.4f}, \nKL: {kl:.4f}, \nAvg Objectives: {avg_obj}\n")
-    print(f"Avg Objectives: {avg_obj}")
+    # print(f"Avg Objectives: {avg_obj}")
 
     return actor, critic, NFE, all_des, all_obj, all_constraints, avg_obj, critic_loss, actor_loss, kl

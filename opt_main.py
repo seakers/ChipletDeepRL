@@ -8,14 +8,17 @@ import pickle
 from ppo_optimization import run_ppo_optimization
 from random_search import run_random_search
 from genetic_algorithm import run_genetic_algorithm
-from utils.evaluation import Speed_Reducer_Design
+from utils.evaluation import Chiplet_Configuration_Design
+from utils.component_classes import Component, StructPanel
+from utils.component_list import getComponents
+from utils.visualization import config_visualization
 
 def main():
 
     num_runs = 1
 
     params = {
-        'num_epochs': 2000,
+        'num_epochs': 750,
         'mini_batch_size': 32,
         'gamma': 0.999,
         'lambda': 0.95,
@@ -28,7 +31,9 @@ def main():
         'model_folder': None,  # Set to None to train from scratch
     }
 
-    eval_function = Speed_Reducer_Design()
+    component_list, transfer_learning_components = getComponents()
+    base_panel = StructPanel()
+    eval_function = Chiplet_Configuration_Design(component_list, base_panel)
 
     os.makedirs(f"results/{params['date_str']}/", exist_ok=True)
 
@@ -173,55 +178,89 @@ def main():
     plt.tight_layout()
     plt.savefig(f"results/{params['date_str']}/hypervolume_plot.png")
 
-    # Plot the first, middle, and last Pareto front for Random Search (final run only)
-    num_pareto_fronts_rs = len(all_runs_pareto_front_obj_rs[-1])
-    middle_index_rs = num_pareto_fronts_rs // 2
+    # Visualize the configuration of 5 designs from the final Pareto front for each method
+    # print(f"Pareto Front RS: {all_runs_pareto_front_obj_rs[-1][-1]}")
+    # print(f"Pareto Front GA: {all_runs_pareto_front_obj_ga[-1][-1]}")
+    # print(f"Pareto Front RL: {all_runs_pareto_front_obj_rl[-1][-1]}")
+    for i, design in enumerate(all_runs_pareto_front_des_rs[-1][-1]):
+        try:
+            struct_panels, components = eval_function.get_panels_and_components(design)
+            config_visualization(struct_panels, components, params['date_str'], f'rs{i}')
+        except Exception as e:
+            print(f"Error visualizing RS design {i}: {e}")
+        if i >= 4:  # Limit to 5 designs
+            break
 
-    plt.figure()
-    pareto_front_obj_rs = all_runs_pareto_front_obj_rs[-1]
-    if num_pareto_fronts_rs > 0:
-        plt.scatter(*zip(*pareto_front_obj_rs[0]), label='RS Final Run - First Pareto Front', color='blue', alpha=0.7, marker='X')
-    if num_pareto_fronts_rs > 1:
-        plt.scatter(*zip(*pareto_front_obj_rs[middle_index_rs]), label='RS Final Run - Middle Pareto Front', color='blue', alpha=0.7, marker='+')
-    if num_pareto_fronts_rs > 2:
-        plt.scatter(*zip(*pareto_front_obj_rs[-1]), label='RS Final Run - Last Pareto Front', color='blue', alpha=0.7)
+    for i, design in enumerate(all_runs_pareto_front_des_ga[-1][-1]):
+        try:
+            struct_panels, components = eval_function.get_panels_and_components(design)
+            config_visualization(struct_panels, components, params['date_str'], f'ga{i}')
+        except Exception as e:
+            print(f"Error visualizing GA design {i}: {e}")
+        if i >= 4:  # Limit to 5 designs
+            break
 
-    # Plot the first, middle, and last Pareto front for Genetic Algorithm (final run only)
-    num_pareto_fronts_ga = len(all_runs_pareto_front_obj_ga[-1])
-    middle_index_ga = num_pareto_fronts_ga // 2
-
-    pareto_front_obj_ga = all_runs_pareto_front_obj_ga[-1]
-    if num_pareto_fronts_ga > 0:
-        plt.scatter(*zip(*pareto_front_obj_ga[0]), label='GA Final Run - First Pareto Front', color='orange', alpha=0.7, marker='x')
-    if num_pareto_fronts_ga > 1:
-        plt.scatter(*zip(*pareto_front_obj_ga[middle_index_ga]), label='GA Final Run - Middle Pareto Front', color='orange', alpha=0.7, marker='+')
-    if num_pareto_fronts_ga > 2:
-        plt.scatter(*zip(*pareto_front_obj_ga[-1]), label='GA Final Run - Last Pareto Front', color='orange', alpha=0.7)
-
-    # Plot the first, middle, and last Pareto front for RL (final run only)
-    num_pareto_fronts_rl = len(all_runs_pareto_front_obj_rl[-1])
-    middle_index_rl = num_pareto_fronts_rl // 2
-
-    pareto_front_obj_rl = all_runs_pareto_front_obj_rl[-1]
-    if num_pareto_fronts_rl > 0:
-        plt.scatter(*zip(*pareto_front_obj_rl[0]), label='RL Final Run - First Pareto Front', color='green', alpha=0.7, marker='o')
-    if num_pareto_fronts_rl > 1:
-        plt.scatter(*zip(*pareto_front_obj_rl[middle_index_rl]), label='RL Final Run - Middle Pareto Front', color='green', alpha=0.7, marker='+')
-    if num_pareto_fronts_rl > 2:
-        plt.scatter(*zip(*pareto_front_obj_rl[-1]), label='RL Final Run - Last Pareto Front', color='green', alpha=0.7)
-
-    plt.title('Pareto Fronts (First, Middle, Last) - RS vs GA vs RL')
-    plt.xlabel('Objective 1')
-    plt.ylabel('Objective 2')
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
-    plt.savefig(f"results/{params['date_str']}/pareto_fronts.png")
+    for i, design in enumerate(all_runs_pareto_front_des_rl[-1][-1]):
+        try:
+            struct_panels, components = eval_function.get_panels_and_components(design)
+            config_visualization(struct_panels, components, params['date_str'], f'rl{i}')
+        except Exception as e:
+            print(f"Error visualizing RL design {i}: {e}")
+        if i >= 4:  # Limit to 5 designs
+            break
 
 
 if __name__ == "__main__":
     main()
     
+
+
+# pareto front plotting, doesn't make sense for more than 3 objectives
+    # # Plot the first, middle, and last Pareto front for Random Search (final run only)
+    # num_pareto_fronts_rs = len(all_runs_pareto_front_obj_rs[-1])
+    # middle_index_rs = num_pareto_fronts_rs // 2
+
+    # plt.figure()
+    # pareto_front_obj_rs = all_runs_pareto_front_obj_rs[-1]
+    # if num_pareto_fronts_rs > 0:
+    #     plt.scatter(*zip(*pareto_front_obj_rs[0]), label='RS Final Run - First Pareto Front', color='blue', alpha=0.7, marker='X')
+    # if num_pareto_fronts_rs > 1:
+    #     plt.scatter(*zip(*pareto_front_obj_rs[middle_index_rs]), label='RS Final Run - Middle Pareto Front', color='blue', alpha=0.7, marker='+')
+    # if num_pareto_fronts_rs > 2:
+    #     plt.scatter(*zip(*pareto_front_obj_rs[-1]), label='RS Final Run - Last Pareto Front', color='blue', alpha=0.7)
+
+    # # Plot the first, middle, and last Pareto front for Genetic Algorithm (final run only)
+    # num_pareto_fronts_ga = len(all_runs_pareto_front_obj_ga[-1])
+    # middle_index_ga = num_pareto_fronts_ga // 2
+
+    # pareto_front_obj_ga = all_runs_pareto_front_obj_ga[-1]
+    # if num_pareto_fronts_ga > 0:
+    #     plt.scatter(*zip(*pareto_front_obj_ga[0]), label='GA Final Run - First Pareto Front', color='orange', alpha=0.7, marker='x')
+    # if num_pareto_fronts_ga > 1:
+    #     plt.scatter(*zip(*pareto_front_obj_ga[middle_index_ga]), label='GA Final Run - Middle Pareto Front', color='orange', alpha=0.7, marker='+')
+    # if num_pareto_fronts_ga > 2:
+    #     plt.scatter(*zip(*pareto_front_obj_ga[-1]), label='GA Final Run - Last Pareto Front', color='orange', alpha=0.7)
+
+    # # Plot the first, middle, and last Pareto front for RL (final run only)
+    # num_pareto_fronts_rl = len(all_runs_pareto_front_obj_rl[-1])
+    # middle_index_rl = num_pareto_fronts_rl // 2
+
+    # pareto_front_obj_rl = all_runs_pareto_front_obj_rl[-1]
+    # if num_pareto_fronts_rl > 0:
+    #     plt.scatter(*zip(*pareto_front_obj_rl[0]), label='RL Final Run - First Pareto Front', color='green', alpha=0.7, marker='o')
+    # if num_pareto_fronts_rl > 1:
+    #     plt.scatter(*zip(*pareto_front_obj_rl[middle_index_rl]), label='RL Final Run - Middle Pareto Front', color='green', alpha=0.7, marker='+')
+    # if num_pareto_fronts_rl > 2:
+    #     plt.scatter(*zip(*pareto_front_obj_rl[-1]), label='RL Final Run - Last Pareto Front', color='green', alpha=0.7)
+
+    # plt.title('Pareto Fronts (First, Middle, Last) - RS vs GA vs RL')
+    # plt.xlabel('Objective 1')
+    # plt.ylabel('Objective 2')
+    # plt.legend()
+    # plt.grid(True)
+    # plt.tight_layout()
+    # plt.savefig(f"results/{params['date_str']}/pareto_fronts.png")
+
 
 # Chiplet Design Params
 
