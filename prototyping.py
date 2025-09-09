@@ -1,3 +1,28 @@
+# import numpy as np
+# import os
+
+# from utils.evaluation import Chiplet_Configuration_Design
+# from utils.component_classes import Component, StructPanel
+# from utils.visualization import config_visualization
+# from utils.config_utils import Euler2DCM
+
+
+# os.makedirs(f"results/{'test'}", exist_ok=True)
+
+# panels = []
+# components = []
+
+# panels.append(StructPanel(location=[0, 0, -1]))
+# for _ in range(4):
+#     location = np.random.uniform(-0.4, 0.4, 3)
+#     print(location)
+#     location[2] = location[2] - 0.6
+#     print(location)
+#     panels.append(StructPanel(dimensions=list(np.random.uniform(0.1, 1, 2)), location=location, orientation=Euler2DCM(np.random.uniform(0, 2*np.pi, 3))))
+
+# components.append(Component(type='test', mass=2, dimensions=[0.1, 0.2, 0.1], location=[0, 0, 0.05-1], orientation=Euler2DCM([0,0,0])))
+# config_visualization(panels,components,'test', 'test')
+
 import numpy as np
 import matplotlib.pyplot as plt
 import datetime
@@ -10,7 +35,7 @@ from utils.component_classes import Component, StructPanel
 from utils.visualization import config_visualization
 
 
-shape = 2 # 'triangle', 'rectangle', 'hexagon'
+shape = 1 # 'triangle', 'rectangle', 'hexagon'
 
 if shape == 0:
     num_panels = 5
@@ -21,14 +46,15 @@ elif shape == 2:
 else:
     print("INVALID SHAPE")
 
-component_list = [Component(type='test', mass=1, dimensions=[0.1,0.1,0.1], heatDisp=1.0, pointing=False) for _ in range(num_panels)]
-component_list.append(Component(type='PCU', mass=2, dimensions=[0.2,0.2,0.1], heatDisp=5.0, pointing=False))
+# component_list = [Component(type='test', mass=1, dimensions=[0.1,0.1,0.1], heatDisp=1.0, pointing=False) for _ in range(num_panels)]
+# component_list.append(Component(type='PCU', mass=2, dimensions=[0.2,0.2,0.1], heatDisp=5.0, pointing=False))
+component_list = [Component(type='PCU', mass=2, dimensions=[0.2,0.2,0.1], heatDisp=5.0, pointing=False)]
 base_panel = StructPanel()
 eval_function = Chiplet_Configuration_Design(component_list, base_panel)
-design = [shape, 0.8, 1., 1.5, 1]
-for i in range(num_panels):
-    design.extend([i, 0.25, 0., 0, 0.])
-design.extend([11, 0., 0., 0, 0.]) # PCU
+design = [shape, 0.8, 1., 1.2, 1]
+# for i in range(num_panels):
+#     design.extend([i, 0.25, 0., 0, 0.])
+design.extend([8, 0., 0., 0, 0.]) # PCU
 cost_list, constraint_cost_bool = eval_function.evaluate(design)
 date_str = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 os.makedirs(f"results/{date_str}", exist_ok=True)

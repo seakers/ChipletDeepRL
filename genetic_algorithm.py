@@ -63,7 +63,8 @@ def run_genetic_algorithm(max_obj, params, eval_function):
             return -np.array(objectives)
 
     def on_generation(ga_instance):
-        print(f"Generation {ga_instance.generations_completed}")
+        if ga_instance.generations_completed % 10 == 0:
+            print(f"Generation {ga_instance.generations_completed}")
 
     # Create the GA instance
     ga_instance = pygad.GA(num_generations=n_gen,

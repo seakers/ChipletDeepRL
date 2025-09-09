@@ -20,7 +20,7 @@ def run_random_search(params, eval_function):
     rng = np.random.default_rng()
 
     for run in range(num_exec):
-        if run % params['mini_batch_size'] == 0:
+        if run % (params['mini_batch_size']*10) == 0:
             print(f"Execution {run+1}/{num_exec}")
         design = []
         for ind, var in enumerate(des_space):
@@ -53,7 +53,7 @@ def run_random_search(params, eval_function):
     all_obj = np.array(all_obj)
     all_constraints = np.array(all_constraints, dtype=bool)
 
-    max_values = np.max(all_obj, axis=0) * 1.1 + 1e-6  # Add a small epsilon to avoid division by zero
+    max_values = np.max(all_obj, axis=0) * 1.5 + 1e-6  # Add a small epsilon to avoid division by zero
     all_obj[all_constraints] = max_values
     print(f"Number of valid designs (False in all_constraints): {np.sum(all_constraints == False)}")
     norm_obj = all_obj / max_values

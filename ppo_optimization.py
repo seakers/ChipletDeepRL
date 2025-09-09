@@ -43,7 +43,8 @@ def run_ppo_optimization(max_objectives, params, eval_function):
     hv_grid = HypervolumeGrid(refPoint=[1.0]*num_objectives)
 
     for epoch in range(epochs):
-        print(f"Epoch {epoch + 1}/{epochs}")
+        if epoch % 10 == 9:
+            print(f"Epoch {epoch + 1}/{epochs}")
         actor, critic, NFE, all_des, all_obj, all_constraints, avg_obj, critic_loss, actor_loss, kl = run_epoch(
             actor, critic, num_actions, NFE, max_objectives,
             all_des, all_obj, all_constraints, device, params, eval_function
@@ -68,10 +69,23 @@ def run_ppo_optimization(max_objectives, params, eval_function):
     hypervolumes = []
 
     for obj in range(NFE):
-        hv_grid.updateHV(norm_obj[obj], all_des[obj])
-        hypervolumes.append(hv_grid.getHV())
-        pareto_front_obj.append(hv_grid.paretoFrontPoint)
-        pareto_front_des.append(hv_grid.paretoFrontSolution)
+        if all_constraints[obj]:
+            hypervolumes.append(hypervolumes[-1] if hypervolumes else 0)
+            pareto_front_obj.append(pareto_front_obj[-1] if pareto_front_obj else [])
+            pareto_front_des.append(pareto_front_des[-1] if pareto_front_des else [])
+        else:
+            try:
+                hv_grid.updateHV(norm_obj[obj], all_des[obj])
+                hypervolumes.append(hv_grid.getHV())
+                pareto_front_obj.append(hv_grid.paretoFrontPoint)
+                pareto_front_des.append(hv_grid.paretoFrontSolution)
+            except Exception as e:
+                print(f"Error updating hypervolume grid: {e}")
+                print(f"Design: {all_des[obj]}")
+                print(f"Objectve: {norm_obj[obj]}")
+                hypervolumes.append(hypervolumes[-1] if hypervolumes else 0)
+                pareto_front_obj.append(pareto_front_obj[-1] if pareto_front_obj else [])
+                pareto_front_des.append(pareto_front_des[-1] if pareto_front_des else [])
         # if (len(hypervolumes) > 1 and hypervolumes[-2] < hypervolumes[-1]) or len(hypervolumes) == 1:
         #     print(f"New max HV found: {hv_grid.getHV()} at NFE {obj+1}")
         #     print(f"Pareto front objectives:\n{hv_grid.paretoFrontPoint}" + \
