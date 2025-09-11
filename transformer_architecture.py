@@ -2,8 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import autocast
-# from torch.cuda.amp import GradScaler
-from torch.amp import GradScaler
+from torch.cuda.amp import GradScaler
+# from torch.amp import GradScaler
 import math
 from scipy.stats import norm
 
@@ -66,7 +66,7 @@ class CustomTransformerDecoder(nn.Module):
 
 class PositionalEncoding(nn.Module):
 
-    def __init__(self, d_model, dropout=0.1, max_len=10000):
+    def __init__(self, d_model, dropout=0.1, max_len=100000):
         super(PositionalEncoding, self).__init__()
         self.dropout = nn.Dropout(p=dropout)
 
@@ -98,7 +98,7 @@ class Actor(nn.Module):
 
         self.nhead = 2
         self.dense_dim = 16
-        self.scaler = GradScaler('cuda' if torch.cuda.is_available() else 'cpu')
+        self.scaler = GradScaler()
         self.clip_ratio = params['clip_ratio']
         
         self.encoder = nn.Linear(1, self.dense_dim)
@@ -119,8 +119,7 @@ class Actor(nn.Module):
             else:
                 print("INVALID DESIGN SPACE")
 
-
-        self.optimizer = torch.optim.Adam(self.parameters(), lr=params['learning_rate'])
+        self.optimizer = torch.optim.Adam(self.parameters(), lr=self.params['learning_rate'])
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=1000, gamma=0.9)
 
 
@@ -224,7 +223,7 @@ class Actor(nn.Module):
             num_vars = observation.size(1)
             new_log_probs = torch.zeros_like(action, dtype=torch.float32).to(self.device)
             pointing_comps = torch.tensor(
-                [comp.pointing for comp in self.comp_list] * self.params['mini_batch_size'],
+                [comp.pointing for comp in self.comp_list] * (self.params['mini_batch_size']),
                 dtype=torch.bool,
                 device=self.device
             )
@@ -295,7 +294,7 @@ class Critic(nn.Module):
 
         self.nhead = 2
         self.dense_dim = 16
-        self.scaler = GradScaler('cuda' if torch.cuda.is_available() else 'cpu')
+        self.scaler = GradScaler()
         self.clip_ratio = params['clip_ratio']
         self.num_objectives = num_objectives
 
@@ -310,7 +309,7 @@ class Critic(nn.Module):
         )
         self.output_layer = nn.Linear(self.dense_dim, self.num_objectives)
 
-        self.optimizer = torch.optim.Adam(self.parameters(), lr=params['learning_rate'])
+        self.optimizer = torch.optim.Adam(self.parameters(), lr=self.params['learning_rate'])
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=1000, gamma=0.9)
 
 

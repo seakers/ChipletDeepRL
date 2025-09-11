@@ -1,14 +1,11 @@
 import numpy as np
 import pygad
 
-from utils.hypervolume_utils import HypervolumeGrid
-
-
 def run_genetic_algorithm(max_obj, params, eval_function):
     """
     Run the Genetic Algorithm for Cascades.
     """
-    print("\n\nRunning Genetic Algorithm...\n\n")
+    # print("\n\nRunning Genetic Algorithm...\n\n")
     pop_size = params['mini_batch_size']
     n_gen = params['num_epochs']
     des_space = eval_function.design_space
@@ -27,7 +24,6 @@ def run_genetic_algorithm(max_obj, params, eval_function):
     all_obj = []
     all_constraints = []
     NFE = 0
-    hv_grid = HypervolumeGrid(refPoint=[1.0]*num_objectives)
 
     def repair_invalid_panels(solution):
         structure_id = int(solution[0])
@@ -63,7 +59,8 @@ def run_genetic_algorithm(max_obj, params, eval_function):
             return -np.array(objectives)
 
     def on_generation(ga_instance):
-        print(f"Generation {ga_instance.generations_completed}")
+        if ga_instance.generations_completed % 10 == 0:
+            print(f"Generation {ga_instance.generations_completed}")
 
     # Create the GA instance
     ga_instance = pygad.GA(num_generations=n_gen,
@@ -83,29 +80,12 @@ def run_genetic_algorithm(max_obj, params, eval_function):
     all_des = np.array(all_des)
     all_obj = np.array(all_obj)
     all_constraints = np.array(all_constraints, dtype=bool)
-    all_obj[all_constraints] = max_obj
+
+    max_values = np.max(all_obj, axis=0) + 1e-6
     print(f"Number of valid designs (False in all_constraints): {np.sum(all_constraints == False)}")
-    
-    norm_obj = all_obj / max_obj
-
-    ref_point = np.ones(num_objectives)
-
-    pareto_front_des = []
-    pareto_front_obj = []
-    hypervolumes = []
-
-    for obj in range(NFE):
-        hv_grid.updateHV(norm_obj[obj], all_des[obj])
-        hypervolumes.append(hv_grid.getHV())
-        pareto_front_obj.append(hv_grid.paretoFrontPoint)
-        pareto_front_des.append(hv_grid.paretoFrontSolution)
-        # if (len(hypervolumes) > 1 and hypervolumes[-2] < hypervolumes[-1]) or len(hypervolumes) == 1:
-        #     print(f"New max HV found: {hv_grid.getHV()} at NFE {obj+1}")
-        #     print(f"Pareto front objectives:\n{hv_grid.paretoFrontPoint}" + \
-        #           f"\nCorresponding designs:\n{hv_grid.paretoFrontSolution}")
     print(f"Total NFE: {NFE}")
 
-    return all_des, all_obj, pareto_front_des, pareto_front_obj, hypervolumes, NFE
+    return all_des, all_obj, all_constraints, NFE, max_values
 
 
 # Chiplet design

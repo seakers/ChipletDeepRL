@@ -1,9 +1,12 @@
+print("Starting imports...")
+
 import numpy as np
 import matplotlib.pyplot as plt
 import datetime
 import sys
 import os
 import pickle
+import json
 
 from ppo_optimization import run_ppo_optimization
 from random_search import run_random_search
@@ -12,14 +15,18 @@ from utils.evaluation import Chiplet_Configuration_Design
 from utils.component_classes import Component, StructPanel
 from utils.component_list import getComponents
 from utils.visualization import config_visualization
+from utils.hypervolume_utils import HypervolumeGrid
+
 
 def main():
+
+    print("Finished imports, starting run!")
 
     num_runs = 20
 
     params = {
-        'num_epochs': 750,
-        'mini_batch_size': 64,
+        'num_epochs': 1500,
+        'mini_batch_size': 16,
         'gamma': 0.999,
         'lambda': 0.95,
         'learning_rate': 0.0001,
@@ -37,8 +44,12 @@ def main():
 
     os.makedirs(f"results/{params['date_str']}/", exist_ok=True)
 
+    with open(f"results/{params['date_str']}/params.json", "w") as json_file:
+        json.dump(params, json_file, indent=4)
+
     all_runs_des_rs = []
     all_runs_obj_rs = []
+    all_runs_constraints_rs = []
     all_runs_pareto_front_des_rs = []
     all_runs_pareto_front_obj_rs = []
     all_runs_hypervolumes_rs = []
@@ -46,6 +57,7 @@ def main():
 
     all_runs_des_ga = []
     all_runs_obj_ga = []
+    all_runs_constraints_ga = []
     all_runs_pareto_front_des_ga = []
     all_runs_pareto_front_obj_ga = []
     all_runs_hypervolumes_ga = []
@@ -53,45 +65,138 @@ def main():
 
     all_runs_des_rl = []
     all_runs_obj_rl = []
+    all_runs_constraints_rl = []
     all_runs_pareto_front_des_rl = []
     all_runs_pareto_front_obj_rl = []
     all_runs_hypervolumes_rl = []
     all_runs_NFE_rl = []
+    all_max_values = []
+
     
 
     for run in range(num_runs):
-        
-        print(f"\n\nStarting run {run + 1}/{num_runs}\n\n")
-
-        # Run Random Search
-        all_des_rs, all_obj_rs, pareto_front_des_rs, pareto_front_obj_rs, hypervolumes_rs, NFE_rs, max_values = run_random_search(params, eval_function)
-
+        print(f"\n\nRandom Search\nStarting run {run + 1}/{num_runs}\n\n")
+        all_des_rs, all_obj_rs, all_constraints_rs, NFE_rs, max_values_rs = run_random_search(params, eval_function)
         all_runs_des_rs.append(all_des_rs)
         all_runs_obj_rs.append(all_obj_rs)
+        all_runs_constraints_rs.append(all_constraints_rs)
+        all_runs_NFE_rs.append(NFE_rs)
+        all_max_values.append(max_values_rs)
+
+    max_values = np.max(np.array(all_max_values), axis=0)
+
+    for run in range(num_runs):
+        print(f"\n\nGenetic Algorithm\nStarting run {run + 1}/{num_runs}\n\n")
+        all_des_ga, all_obj_ga, all_constraints_ga, NFE_ga, max_vals_ga = run_genetic_algorithm(max_values, params, eval_function)
+        all_runs_des_ga.append(all_des_ga)
+        all_runs_obj_ga.append(all_obj_ga)
+        all_runs_constraints_ga.append(all_constraints_ga)
+        all_runs_NFE_ga.append(NFE_ga)
+        all_max_values.append(max_vals_ga)
+
+    for run in range(num_runs):
+        print(f"\n\nReinforcement Learning\nStarting run {run + 1}/{num_runs}\n\n")
+        all_des_rl, all_obj_rl, all_constraints_rl, NFE_rl, max_vals_rl = run_ppo_optimization(max_values, params, eval_function)
+        all_runs_des_rl.append(all_des_rl)
+        all_runs_obj_rl.append(all_obj_rl)
+        all_runs_constraints_rl.append(all_constraints_rl)
+        all_runs_NFE_rl.append(NFE_rl)
+        all_max_values.append(max_vals_rl)
+
+    max_values = np.max(np.array(all_max_values), axis=0)
+    print(f"\nOverall max values used for normalization across all runs and methods: {max_values}\n")
+
+    # Hypervolume Calculations
+    ref_point = np.ones(eval_function.num_objectives)
+
+    for run, NFE in enumerate(all_runs_NFE_rs):
+        hv_grid_rs = HypervolumeGrid(ref_point)
+        pareto_front_des_rs = []
+        pareto_front_obj_rs = []
+        hypervolumes_rs = []
+        all_runs_obj_rs[run][all_runs_constraints_rs[run]] = max_values
+        norm_obj = all_runs_obj_rs[run] / max_values
+        all_des = all_runs_des_rs[run]
+        for obj in range(NFE):
+            if all_runs_constraints_rs[run][obj]:
+                hypervolumes_rs.append(hypervolumes_rs[-1] if hypervolumes_rs else 0)
+                pareto_front_obj_rs.append(pareto_front_obj_rs[-1] if pareto_front_obj_rs else [])
+                pareto_front_des_rs.append(pareto_front_des_rs[-1] if pareto_front_des_rs else [])
+            else:
+                try:
+                    hv_grid_rs.updateHV(norm_obj[obj], all_des[obj])
+                    hypervolumes_rs.append(hv_grid_rs.getHV())
+                    pareto_front_obj_rs.append(hv_grid_rs.paretoFrontPoint)
+                    pareto_front_des_rs.append(hv_grid_rs.paretoFrontSolution)
+                except Exception as e:
+                    print(f"Error updating hypervolume grid: {e}")
+                    hypervolumes_rs.append(hypervolumes_rs[-1] if hypervolumes_rs else 0)
+                    pareto_front_obj_rs.append(pareto_front_obj_rs[-1] if pareto_front_obj_rs else [])
+                    pareto_front_des_rs.append(pareto_front_des_rs[-1] if pareto_front_des_rs else [])
+
         all_runs_pareto_front_des_rs.append(pareto_front_des_rs)
         all_runs_pareto_front_obj_rs.append(pareto_front_obj_rs)
         all_runs_hypervolumes_rs.append(hypervolumes_rs)
-        all_runs_NFE_rs.append(NFE_rs)
 
-        # Run Genetic Algorithm
-        all_des_ga, all_obj_ga, pareto_front_des_ga, pareto_front_obj_ga, hypervolumes_ga, NFE_ga = run_genetic_algorithm(max_values, params, eval_function)
+    for run, NFE in enumerate(all_runs_NFE_ga):
+        hv_grid_ga = HypervolumeGrid(ref_point)
+        pareto_front_des_ga = []
+        pareto_front_obj_ga = []
+        hypervolumes_ga = []
+        all_runs_obj_ga[run][all_runs_constraints_ga[run]] = max_values
+        norm_obj = all_runs_obj_ga[run] / max_values
+        all_des = all_runs_des_ga[run]
+        for obj in range(NFE):
+            if all_runs_constraints_ga[run][obj]:
+                hypervolumes_ga.append(hypervolumes_ga[-1] if hypervolumes_ga else 0)
+                pareto_front_obj_ga.append(pareto_front_obj_ga[-1] if pareto_front_obj_ga else [])
+                pareto_front_des_ga.append(pareto_front_des_ga[-1] if pareto_front_des_ga else [])
+            else:
+                try:
+                    hv_grid_ga.updateHV(norm_obj[obj], all_des[obj])
+                    hypervolumes_ga.append(hv_grid_ga.getHV())
+                    pareto_front_obj_ga.append(hv_grid_ga.paretoFrontPoint)
+                    pareto_front_des_ga.append(hv_grid_ga.paretoFrontSolution)
+                except Exception as e:
+                    print(f"Error updating hypervolume grid (GA): {e}")
+                    hypervolumes_ga.append(hypervolumes_ga[-1] if hypervolumes_ga else 0)
+                    pareto_front_obj_ga.append(pareto_front_obj_ga[-1] if pareto_front_obj_ga else [])
+                    pareto_front_des_ga.append(pareto_front_des_ga[-1] if pareto_front_des_ga else [])
 
-        all_runs_des_ga.append(all_des_ga)
-        all_runs_obj_ga.append(all_obj_ga)
         all_runs_pareto_front_des_ga.append(pareto_front_des_ga)
         all_runs_pareto_front_obj_ga.append(pareto_front_obj_ga)
         all_runs_hypervolumes_ga.append(hypervolumes_ga)
-        all_runs_NFE_ga.append(NFE_ga)
 
-        # Run PPO Optimization
-        all_des_rl, all_obj_rl, pareto_front_des_rl, pareto_front_obj_rl, hypervolumes_rl, NFE_rl = run_ppo_optimization(max_values, params, eval_function)
+    for run, NFE in enumerate(all_runs_NFE_rl):
+        hv_grid_rl = HypervolumeGrid(ref_point)
+        pareto_front_des_rl = []
+        pareto_front_obj_rl = []
+        hypervolumes_rl = []
+        all_runs_obj_rl[run][all_runs_constraints_rl[run]] = max_values
+        norm_obj = all_runs_obj_rl[run] / max_values
+        all_des = all_runs_des_rl[run]
+        for obj in range(NFE):
+            if all_runs_constraints_rl[run][obj]:
+                hypervolumes_rl.append(hypervolumes_rl[-1] if hypervolumes_rl else 0)
+                pareto_front_obj_rl.append(pareto_front_obj_rl[-1] if pareto_front_obj_rl else [])
+                pareto_front_des_rl.append(pareto_front_des_rl[-1] if pareto_front_des_rl else [])
+            else:
+                try:
+                    hv_grid_rl.updateHV(norm_obj[obj], all_des[obj])
+                    hypervolumes_rl.append(hv_grid_rl.getHV())
+                    pareto_front_obj_rl.append(hv_grid_rl.paretoFrontPoint)
+                    pareto_front_des_rl.append(hv_grid_rl.paretoFrontSolution)
+                except Exception as e:
+                    print(f"Error updating hypervolume grid (RL): {e}")
+                    hypervolumes_rl.append(hypervolumes_rl[-1] if hypervolumes_rl else 0)
+                    pareto_front_obj_rl.append(pareto_front_obj_rl[-1] if pareto_front_obj_rl else [])
+                    pareto_front_des_rl.append(pareto_front_des_rl[-1] if pareto_front_des_rl else [])
 
-        all_runs_des_rl.append(all_des_rl)
-        all_runs_obj_rl.append(all_obj_rl)
         all_runs_pareto_front_des_rl.append(pareto_front_des_rl)
         all_runs_pareto_front_obj_rl.append(pareto_front_obj_rl)
         all_runs_hypervolumes_rl.append(hypervolumes_rl)
-        all_runs_NFE_rl.append(NFE_rl)
+
+    print(f"Max values used for normalization: {max_values}")
 
     # pygad won't run fitness on designs already seen, so we need to truncate the lists to the smallest NFE so we can do comparisons
     min_NFE_ga = min(all_runs_NFE_ga)
