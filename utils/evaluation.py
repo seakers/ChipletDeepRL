@@ -512,7 +512,7 @@ class Chiplet_Configuration_Design():
             if panel_choice >= len(self.structure_panels):
                 panel_choice -= self.max_shelves # shelves have two possibilities
             if self.structure_panels[int(panel_choice)] is None:
-                print(f"PANEL CHOICE INVALID: {panel_choice} for component {comp}")
+                # print(f"PANEL CHOICE INVALID: {panel_choice} for component {comp}")
                 # print(f"VALID PANELS: {[i for i, panel in enumerate(self.structure_panels) if panel is not None]}")
                 # print(f"Full Design Vector: {x}")
                 return [-1]*self.num_objectives, True  # constraint violated if a non-existent panel is chosen

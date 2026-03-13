@@ -6,26 +6,26 @@ def getComponents():
     # Spacecraft Component Adaptive Layout Environment (SCALE): An efficient optimization tool
     # by Fakoor
     # transferLearningComponents = [
-    componentList = [
-        Component(type="battery", mass=8, dimensions=[.25,.2,.15], heatDisp=2, pointing=False),
-        Component(type="reaction wheel", mass=2, dimensions=[.075,.240,.240], heatDisp=2, pointing=False),
-        Component(type="reaction wheel", mass=2, dimensions=[.075,.240,.240], heatDisp=2, pointing=False),
-        Component(type="reaction wheel", mass=2, dimensions=[.075,.240,.240], heatDisp=2, pointing=False),
-        Component(type="gyro", mass=3, dimensions=[.1876,.1239,.0015], heatDisp=2.5, pointing=False),
-        Component(type="gyro", mass=3, dimensions=[.1876,.1239,.0015], heatDisp=2.5, pointing=False),
-        Component(type="transmitter", mass=4.5, dimensions=[.25,.15,.05], heatDisp=12, pointing=True),
-        Component(type="transmitter", mass=3.5, dimensions=[.2,.1,.05], heatDisp=10, pointing=True),
-        Component(type="reciever", mass=4, dimensions=[.2,.15,.03], heatDisp=11, pointing=True),
-        Component(type="reciever", mass=3, dimensions=[.175,.125,.03], heatDisp=9, pointing=True),
-        Component(type="PCU", mass=7, dimensions=[.3,.2,.15], heatDisp=7, pointing=False),
-        Component(type="OBDH", mass=9, dimensions=[.24,.18,.18], heatDisp=6, pointing=False),
-        Component(type="magnetometer", mass=1.5, dimensions=[.15,.12,.04], heatDisp=1.5, pointing=False),
-        Component(type="magnetometer", mass=1.5, dimensions=[.15,.12,.04], heatDisp=1.5, pointing=False),
-        Component(type="magnetometer", mass=1.5, dimensions=[.15,.12,.04], heatDisp=1.5, pointing=False),
-        Component(type="payload", mass=5, dimensions=[.3,.25,.2], heatDisp=3, pointing=True),
-        Component(type="solar panel", mass=1.5, dimensions=[.3,.5,.01], heatDisp=1.5, pointing=True),
-        Component(type="solar panel", mass=1.5, dimensions=[.3,.5,.01], heatDisp=1.5, pointing=True)
-    ]
+    # componentList = [
+    #     Component(type="battery", mass=8, dimensions=[.25,.2,.15], heatDisp=2, pointing=False),
+    #     Component(type="reaction wheel", mass=2, dimensions=[.075,.240,.240], heatDisp=2, pointing=False),
+    #     Component(type="reaction wheel", mass=2, dimensions=[.075,.240,.240], heatDisp=2, pointing=False),
+    #     Component(type="reaction wheel", mass=2, dimensions=[.075,.240,.240], heatDisp=2, pointing=False),
+    #     Component(type="gyro", mass=3, dimensions=[.1876,.1239,.0015], heatDisp=2.5, pointing=False),
+    #     Component(type="gyro", mass=3, dimensions=[.1876,.1239,.0015], heatDisp=2.5, pointing=False),
+    #     Component(type="transmitter", mass=4.5, dimensions=[.25,.15,.05], heatDisp=12, pointing=True),
+    #     Component(type="transmitter", mass=3.5, dimensions=[.2,.1,.05], heatDisp=10, pointing=True),
+    #     Component(type="reciever", mass=4, dimensions=[.2,.15,.03], heatDisp=11, pointing=True),
+    #     Component(type="reciever", mass=3, dimensions=[.175,.125,.03], heatDisp=9, pointing=True),
+    #     Component(type="PCU", mass=7, dimensions=[.3,.2,.15], heatDisp=7, pointing=False),
+    #     Component(type="OBDH", mass=9, dimensions=[.24,.18,.18], heatDisp=6, pointing=False),
+    #     Component(type="magnetometer", mass=1.5, dimensions=[.15,.12,.04], heatDisp=1.5, pointing=False),
+    #     Component(type="magnetometer", mass=1.5, dimensions=[.15,.12,.04], heatDisp=1.5, pointing=False),
+    #     Component(type="magnetometer", mass=1.5, dimensions=[.15,.12,.04], heatDisp=1.5, pointing=False),
+    #     Component(type="payload", mass=5, dimensions=[.3,.25,.2], heatDisp=3, pointing=True),
+    #     Component(type="solar panel", mass=1.5, dimensions=[.3,.5,.01], heatDisp=1.5, pointing=True),
+    #     Component(type="solar panel", mass=1.5, dimensions=[.3,.5,.01], heatDisp=1.5, pointing=True)
+    # ]
     # componentList = [
     #     # Component(type="battery", mass=8, dimensions=[.25,.2,.15], heatDisp=2),
     #     # Component(type="transmitter", mass=3.5, dimensions=[.2,.1,.05], heatDisp=10),
@@ -123,67 +123,67 @@ def getComponents():
     # ]
     # ]
 
-    # componentList = [
-    #     Component(type="solar panel", mass=1.5, dimensions=[.2,.5,.01], heatDisp=1.5),
-    #     Component(type="solar panel", mass=1.6, dimensions=[.21,.52,.01], heatDisp=1.6),
-    #     Component(type="solar panel", mass=1.4, dimensions=[.19,.49,.01], heatDisp=1.4),
+    componentList = [
+        Component(type="solar panel", mass=1.5, dimensions=[.2,.5,.01], heatDisp=1.5, pointing=True),
+        Component(type="solar panel", mass=1.6, dimensions=[.21,.52,.01], heatDisp=1.6, pointing=True),
+        Component(type="solar panel", mass=1.4, dimensions=[.19,.49,.01], heatDisp=1.4, pointing=True),
 
-    #     Component(type="payload", mass=6.5, dimensions=[.3,.24,.22], heatDisp=3.2),
-    #     Component(type="payload", mass=5.5, dimensions=[.28,.22,.2], heatDisp=3),
+        Component(type="payload", mass=6.5, dimensions=[.3,.24,.22], heatDisp=3.2, pointing=True),
+        Component(type="payload", mass=5.5, dimensions=[.28,.22,.2], heatDisp=3, pointing=True),
 
-    #     Component(type="transmitter", mass=3.8, dimensions=[.25,.1,.08], heatDisp=12),
-    #     Component(type="transmitter", mass=4.0, dimensions=[.23,.12,.09], heatDisp=11),
+        Component(type="transmitter", mass=3.8, dimensions=[.25,.1,.08], heatDisp=12, pointing=True),
+        Component(type="transmitter", mass=4.0, dimensions=[.23,.12,.09], heatDisp=11, pointing=True),
 
-    #     Component(type="receiver", mass=3.3, dimensions=[.21,.12,.05], heatDisp=9),
-    #     Component(type="receiver", mass=3.5, dimensions=[.22,.13,.06], heatDisp=9.5),
+        Component(type="receiver", mass=3.3, dimensions=[.21,.12,.05], heatDisp=9, pointing=True),
+        Component(type="receiver", mass=3.5, dimensions=[.22,.13,.06], heatDisp=9.5, pointing=True),
 
-    #     Component(type="antenna", mass=4.5, dimensions=[.35,.14,.12], heatDisp=9.7),
-    #     Component(type="antenna", mass=3.2, dimensions=[.24,.1,.08], heatDisp=8),
-    #     Component(type="antenna", mass=4.0, dimensions=[.34,.15,.1], heatDisp=9),
+        Component(type="antenna", mass=4.5, dimensions=[.35,.14,.12], heatDisp=9.7, pointing=True),
+        Component(type="antenna", mass=3.2, dimensions=[.24,.1,.08], heatDisp=8, pointing=True),
+        Component(type="antenna", mass=4.0, dimensions=[.34,.15,.1], heatDisp=9, pointing=True),
 
-    #     Component(type="star tracker", mass=1.7, dimensions=[.11,.13,.1], heatDisp=1.3),
-    #     Component(type="star tracker", mass=1.8, dimensions=[.12,.14,.11], heatDisp=1.4),
-    #     Component(type="star tracker", mass=1.6, dimensions=[.1,.12,.1], heatDisp=1.2),
+        Component(type="star tracker", mass=1.7, dimensions=[.11,.13,.1], heatDisp=1.3, pointing=True),
+        Component(type="star tracker", mass=1.8, dimensions=[.12,.14,.11], heatDisp=1.4, pointing=True),
+        Component(type="star tracker", mass=1.6, dimensions=[.1,.12,.1], heatDisp=1.2, pointing=True),
 
-    #     Component(type="sun sensor", mass=1.2, dimensions=[.1,.09,.08], heatDisp=0.9),
-    #     Component(type="sun sensor", mass=1.1, dimensions=[.1,.08,.07], heatDisp=1),
-    #     Component(type="sun sensor", mass=1.3, dimensions=[.12,.1,.09], heatDisp=1.1),
+        Component(type="sun sensor", mass=1.2, dimensions=[.1,.09,.08], heatDisp=0.9, pointing=True),
+        Component(type="sun sensor", mass=1.1, dimensions=[.1,.08,.07], heatDisp=1, pointing=True),
+        Component(type="sun sensor", mass=1.3, dimensions=[.12,.1,.09], heatDisp=1.1, pointing=True),
 
-    #     Component(type="battery", mass=5.8, dimensions=[.23,.21,.13], heatDisp=2.2),
-    #     Component(type="battery", mass=6.0, dimensions=[.24,.22,.14], heatDisp=2.4),
+        Component(type="battery", mass=5.8, dimensions=[.23,.21,.13], heatDisp=2.2, pointing=False),
+        Component(type="battery", mass=6.0, dimensions=[.24,.22,.14], heatDisp=2.4, pointing=False),
 
-    #     Component(type="PCU", mass=7, dimensions=[.26,.2,.14], heatDisp=6.5),
-    #     Component(type="PCU", mass=6.5, dimensions=[.25,.19,.13], heatDisp=6.3),
+        Component(type="PCU", mass=7, dimensions=[.26,.2,.14], heatDisp=6.5, pointing=False),
+        Component(type="PCU", mass=6.5, dimensions=[.25,.19,.13], heatDisp=6.3, pointing=False),
 
-    #     Component(type="OBDH", mass=9, dimensions=[.24,.19,.16], heatDisp=5.8),
-    #     Component(type="OBDH", mass=8.8, dimensions=[.23,.18,.15], heatDisp=5.7),
+        Component(type="OBDH", mass=9, dimensions=[.24,.19,.16], heatDisp=5.8, pointing=False),
+        Component(type="OBDH", mass=8.8, dimensions=[.23,.18,.15], heatDisp=5.7, pointing=False),
 
-    #     Component(type="reaction wheel", mass=3, dimensions=[.14,.12,.1], heatDisp=3.2),
-    #     Component(type="reaction wheel", mass=3.2, dimensions=[.15,.13,.11], heatDisp=3.3),
+        Component(type="reaction wheel", mass=3, dimensions=[.14,.12,.1], heatDisp=3.2, pointing=False),
+        Component(type="reaction wheel", mass=3.2, dimensions=[.15,.13,.11], heatDisp=3.3, pointing=False),
 
-    #     Component(type="propellant tank", mass=13, dimensions=[.3,.25,.2], heatDisp=4.2),
-    #     Component(type="propellant tank", mass=12.5, dimensions=[.29,.24,.19], heatDisp=4.1),
+        Component(type="propellant tank", mass=13, dimensions=[.3,.25,.2], heatDisp=4.2, pointing=False),
+        Component(type="propellant tank", mass=12.5, dimensions=[.29,.24,.19], heatDisp=4.1, pointing=False),
 
-    #     Component(type="attitude thruster", mass=2.5, dimensions=[.15,.14,.12], heatDisp=4.8),
-    #     Component(type="attitude thruster", mass=2.7, dimensions=[.16,.15,.13], heatDisp=5),
+        Component(type="attitude thruster", mass=2.5, dimensions=[.15,.14,.12], heatDisp=4.8, pointing=True),
+        Component(type="attitude thruster", mass=2.7, dimensions=[.16,.15,.13], heatDisp=5, pointing=True),
 
-    #     Component(type="IMU", mass=2.5, dimensions=[.14,.12,.09], heatDisp=2.5),
-    #     Component(type="IMU", mass=2.4, dimensions=[.13,.11,.08], heatDisp=2.4),
+        Component(type="IMU", mass=2.5, dimensions=[.14,.12,.09], heatDisp=2.5, pointing=False),
+        Component(type="IMU", mass=2.4, dimensions=[.13,.11,.08], heatDisp=2.4, pointing=False),
 
-    #     Component(type="atomic clock", mass=1.8, dimensions=[.12,.11,.07], heatDisp=1.6),
+        Component(type="atomic clock", mass=1.8, dimensions=[.12,.11,.07], heatDisp=1.6, pointing=False),
 
-    #     Component(type="heater", mass=1.2, dimensions=[.09,.07,.05], heatDisp=1.9),
-    #     Component(type="heater", mass=1.3, dimensions=[.1,.08,.06], heatDisp=2),
+        Component(type="heater", mass=1.2, dimensions=[.09,.07,.05], heatDisp=1.9, pointing=False),
+        Component(type="heater", mass=1.3, dimensions=[.1,.08,.06], heatDisp=2, pointing=False),
 
-    #     Component(type="gyro", mass=3.1, dimensions=[.19,.13,.02], heatDisp=2.8),
-    #     Component(type="gyro", mass=3.0, dimensions=[.18,.12,.02], heatDisp=2.7),
+        Component(type="gyro", mass=3.1, dimensions=[.19,.13,.02], heatDisp=2.8, pointing=False),
+        Component(type="gyro", mass=3.0, dimensions=[.18,.12,.02], heatDisp=2.7, pointing=False),
 
-    #     Component(type="magnetometer", mass=1.4, dimensions=[.1,.12,.1], heatDisp=1.1),
-    #     Component(type="magnetometer", mass=1.5, dimensions=[.11,.13,.09], heatDisp=1.2),
+        Component(type="magnetometer", mass=1.4, dimensions=[.1,.12,.1], heatDisp=1.1, pointing=False),
+        Component(type="magnetometer", mass=1.5, dimensions=[.11,.13,.09], heatDisp=1.2, pointing=False),
 
-    #     Component(type="accelerometer", mass=1.8, dimensions=[.13,.11,.09], heatDisp=2.2),
-    #     Component(type="accelerometer", mass=1.7, dimensions=[.12,.1,.08], heatDisp=2.1)
-    # ]
+        Component(type="accelerometer", mass=1.8, dimensions=[.13,.11,.09], heatDisp=2.2, pointing=False),
+        Component(type="accelerometer", mass=1.7, dimensions=[.12,.1,.08], heatDisp=2.1, pointing=False)
+    ]
 
     # transferLearningComponents = [
     #     [
