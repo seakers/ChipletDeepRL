@@ -97,7 +97,7 @@ def store_results(storage, method_name, results):
 def truncate_data(storage, methods):
     """Truncate data for all methods to the same size"""
     for method in methods:
-        if method.name == "Genetic Algorithm" or method.name == "Warm Start GA" or method.name == "Design Repair" or method.name == "Intelligent Mutation GA":
+        if method.name == "Genetic Algorithm" or method.name == "Warm Start GA" or method.name == "Design Repair" or method.name == "Intelligent Mutation GA" or method.name == "Warm Start Intelligent Mutation GA":
             key = method.name.replace(" ", "_").lower()
             if key not in storage or not storage[key]['all_runs_NFE']:
                 continue
@@ -206,10 +206,10 @@ def save_single_run(method_name, run_idx, results, params):
 
 def main():
     # Configuration
-    num_runs = 1  # Example: increased runs to show utility
+    num_runs = 10  # Example: increased runs to show utility
     
     params = {
-        'num_epochs': 250,
+        'num_epochs': 500,
         'mini_batch_size': 64,
         'gamma': 0.999,
         'lambda': 0.95,
