@@ -162,7 +162,7 @@ def run_warm_start_intelligent_ga(max_obj, params, eval_function):
                 if stop_decision.item() == 1:  # Stop decision is 1 (stop)
                     stop_token = True
 
-            offspring[ind] = new_design
+            offspring[ind] = repair_invalid_panels(new_design)
 
         return offspring    
 

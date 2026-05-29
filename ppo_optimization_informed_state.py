@@ -129,7 +129,7 @@ def run_ppo_optimization_informed_state(max_objectives, params, eval_function):
 def get_models(num_actions, device, params, unique_des_space, num_objectives, comp_list):
     # Add num_objectives parameter to Actor constructor
     actor = Actor(device=device, params=params, des_space=unique_des_space, comp_list=comp_list, num_objectives=num_objectives)
-    critic = Critic(device=device, params=params, num_objectives=num_objectives, input_dim=num_objectives+num_actions)
+    critic = Critic(device=device, params=params, num_objectives=num_objectives)
 
     actor.to(device)
     critic.to(device)
@@ -294,7 +294,7 @@ def run_epoch(actor, critic, num_actions, NFE, max_obj, all_des, all_obj, all_co
             advantage_tensor
         )
         if kl > targetkl:
-            print("KL Divergence exceeded target, stopping actor update")
+            # print("KL Divergence exceeded target, stopping actor update")
             break
 
     critic_iterations = params['update_iterations']

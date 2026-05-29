@@ -185,6 +185,52 @@ def getComponents():
         Component(type="accelerometer", mass=1.7, dimensions=[.12,.1,.08], heatDisp=2.1, pointing=False)
     ]
 
+    transferLearningComponents = [
+        [
+            Component(type="solar panel", mass=1.8, dimensions=[0.22, 0.53, 0.012], heatDisp=1.7, pointing=True),
+            Component(type="solar panel", mass=1.5, dimensions=[0.20, 0.48, 0.01], heatDisp=1.5, pointing=True),
+            Component(type="solar panel", mass=1.7, dimensions=[0.23, 0.52, 0.011], heatDisp=1.6, pointing=True),
+            Component(type="payload", mass=6.8, dimensions=[0.31, 0.25, 0.22], heatDisp=3.3, pointing=True),
+            Component(type="payload", mass=5.9, dimensions=[0.29, 0.24, 0.21], heatDisp=3.2, pointing=True),
+            Component(type="transmitter", mass=4.2, dimensions=[0.26, 0.12, 0.09], heatDisp=12.5, pointing=True),
+            Component(type="transmitter", mass=3.9, dimensions=[0.25, 0.11, 0.08], heatDisp=11.3, pointing=True),
+            Component(type="receiver", mass=3.4, dimensions=[0.22, 0.13, 0.06], heatDisp=9.7, pointing=True),
+            Component(type="receiver", mass=3.7, dimensions=[0.24, 0.14, 0.07], heatDisp=10, pointing=True),
+            Component(type="antenna", mass=4.2, dimensions=[0.36, 0.15, 0.11], heatDisp=10, pointing=True),
+            Component(type="antenna", mass=3.8, dimensions=[0.30, 0.12, 0.09], heatDisp=9, pointing=True),
+            Component(type="antenna", mass=4.5, dimensions=[0.37, 0.16, 0.12], heatDisp=10.2, pointing=True),
+            Component(type="star tracker", mass=1.9, dimensions=[0.13, 0.15, 0.11], heatDisp=1.5, pointing=True),
+            Component(type="star tracker", mass=1.6, dimensions=[0.11, 0.13, 0.10], heatDisp=1.3, pointing=True),
+            Component(type="star tracker", mass=1.8, dimensions=[0.12, 0.14, 0.11], heatDisp=1.4, pointing=True),
+            Component(type="sun sensor", mass=1.3, dimensions=[0.11, 0.10, 0.08], heatDisp=1.2, pointing=True),
+            Component(type="sun sensor", mass=1.4, dimensions=[0.12, 0.11, 0.09], heatDisp=1.3, pointing=True),
+            Component(type="sun sensor", mass=1.2, dimensions=[0.10, 0.09, 0.07], heatDisp=1.1, pointing=True),
+            Component(type="battery", mass=6.3, dimensions=[0.25, 0.23, 0.15], heatDisp=2.6, pointing=False),
+            Component(type="battery", mass=6.1, dimensions=[0.24, 0.22, 0.14], heatDisp=2.5, pointing=False),
+            Component(type="PCU", mass=6.9, dimensions=[0.27, 0.21, 0.15], heatDisp=6.7, pointing=False),
+            Component(type="PCU", mass=6.6, dimensions=[0.26, 0.20, 0.14], heatDisp=6.4, pointing=False),
+            Component(type="OBDH", mass=9.5, dimensions=[0.26, 0.20, 0.17], heatDisp=6.0, pointing=False),
+            Component(type="OBDH", mass=8.9, dimensions=[0.25, 0.19, 0.16], heatDisp=5.9, pointing=False),
+            Component(type="reaction wheel", mass=3.4, dimensions=[0.15, 0.13, 0.11], heatDisp=3.5, pointing=False),
+            Component(type="reaction wheel", mass=3.1, dimensions=[0.14, 0.12, 0.10], heatDisp=3.3, pointing=False),
+            Component(type="propellant tank", mass=13.2, dimensions=[0.31, 0.26, 0.21], heatDisp=4.3, pointing=False),
+            Component(type="propellant tank", mass=12.8, dimensions=[0.30, 0.25, 0.20], heatDisp=4.2, pointing=False),
+            Component(type="attitude thruster", mass=2.6, dimensions=[0.16, 0.15, 0.13], heatDisp=5.2, pointing=True),
+            Component(type="attitude thruster", mass=2.8, dimensions=[0.17, 0.16, 0.14], heatDisp=5.3, pointing=True),
+            Component(type="IMU", mass=2.7, dimensions=[0.15, 0.13, 0.10], heatDisp=2.6, pointing=False),
+            Component(type="IMU", mass=2.5, dimensions=[0.14, 0.12, 0.09], heatDisp=2.5, pointing=False),
+            Component(type="atomic clock", mass=1.9, dimensions=[0.13, 0.12, 0.08], heatDisp=1.8, pointing=False),
+            Component(type="heater", mass=1.4, dimensions=[0.11, 0.09, 0.06], heatDisp=2.1, pointing=False),
+            Component(type="heater", mass=1.3, dimensions=[0.10, 0.08, 0.05], heatDisp=2.0, pointing=False),
+            Component(type="gyro", mass=3.2, dimensions=[0.20, 0.14, 0.03], heatDisp=3.0, pointing=False),
+            Component(type="gyro", mass=3.3, dimensions=[0.19, 0.13, 0.03], heatDisp=2.9, pointing=False),
+            Component(type="magnetometer", mass=1.6, dimensions=[0.11, 0.13, 0.11], heatDisp=1.3, pointing=False),
+            Component(type="magnetometer", mass=1.5, dimensions=[0.10, 0.12, 0.10], heatDisp=1.2, pointing=False),
+            Component(type="accelerometer", mass=1.9, dimensions=[0.14, 0.12, 0.10], heatDisp=2.4, pointing=False),
+            Component(type="accelerometer", mass=1.8, dimensions=[0.13, 0.11, 0.09], heatDisp=2.3, pointing=False),
+        ]
+    ]
+
     # transferLearningComponents = [
     #     [
     #     Component(type="solar panel", mass=1.8, dimensions=[0.22, 0.53, 0.012], heatDisp=1.7),
@@ -362,6 +408,6 @@ def getComponents():
     #     ]
     # ]
 
-    transferLearningComponents = None
+    # transferLearningComponents = None
 
     return componentList, transferLearningComponents

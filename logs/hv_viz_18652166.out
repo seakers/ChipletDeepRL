@@ -1,0 +1,40 @@
+Job started on c608 at Thu May 28 08:16:06 CDT 2026
+Loading primary folder...
+Warning: HV/Pareto file not found: results/2026-05-04_13-51-50/hv_pareto_data/aos_ga_policy_run_0.pkl
+Warning: HV/Pareto file not found: results/2026-05-04_13-51-50/hv_pareto_data/aos_ga_policy_run_1.pkl
+Warning: HV/Pareto file not found: results/2026-05-04_13-51-50/hv_pareto_data/aos_ga_policy_run_2.pkl
+Warning: HV/Pareto file not found: results/2026-05-04_13-51-50/hv_pareto_data/aos_ga_policy_run_3.pkl
+Warning: HV/Pareto file not found: results/2026-05-04_13-51-50/hv_pareto_data/aos_ga_policy_run_4.pkl
+Warning: HV/Pareto file not found: results/2026-05-04_13-51-50/hv_pareto_data/aos_ga_policy_run_5.pkl
+Warning: HV/Pareto file not found: results/2026-05-04_13-51-50/hv_pareto_data/aos_ga_policy_run_6.pkl
+Warning: HV/Pareto file not found: results/2026-05-04_13-51-50/hv_pareto_data/aos_ga_policy_run_7.pkl
+Warning: HV/Pareto file not found: results/2026-05-04_13-51-50/hv_pareto_data/aos_ga_policy_run_8.pkl
+Warning: HV/Pareto file not found: results/2026-05-04_13-51-50/hv_pareto_data/aos_ga_policy_run_9.pkl
+Warning: HV/Pareto file not found: results/2026-05-04_13-51-50/hv_pareto_data/aos_ga_classical_run_0.pkl
+Warning: HV/Pareto file not found: results/2026-05-04_13-51-50/hv_pareto_data/aos_ga_classical_run_1.pkl
+Warning: HV/Pareto file not found: results/2026-05-04_13-51-50/hv_pareto_data/aos_ga_classical_run_2.pkl
+Warning: HV/Pareto file not found: results/2026-05-04_13-51-50/hv_pareto_data/aos_ga_classical_run_3.pkl
+Warning: HV/Pareto file not found: results/2026-05-04_13-51-50/hv_pareto_data/aos_ga_classical_run_4.pkl
+Warning: HV/Pareto file not found: results/2026-05-04_13-51-50/hv_pareto_data/aos_ga_classical_run_5.pkl
+Warning: HV/Pareto file not found: results/2026-05-04_13-51-50/hv_pareto_data/aos_ga_classical_run_6.pkl
+Warning: HV/Pareto file not found: results/2026-05-04_13-51-50/hv_pareto_data/aos_ga_classical_run_7.pkl
+Warning: HV/Pareto file not found: results/2026-05-04_13-51-50/hv_pareto_data/aos_ga_classical_run_8.pkl
+Warning: HV/Pareto file not found: results/2026-05-04_13-51-50/hv_pareto_data/aos_ga_classical_run_9.pkl
+Primary folder loaded.
+Loading GA hybrid split folders...
+  Loading 10 run(s) from results/2026-05-17_11-27-22...
+
+Run counts after aggregation:
+  Random Search: 10 runs
+  Genetic Algorithm: 10 runs
+  RL Informed Env: 10 runs
+  Warm Start GA: 10 runs
+  Design Repair: 10 runs
+  Intelligent Mutation GA: 10 runs
+  Warm Start Intelligent Mutation GA: 10 runs
+  AOS GA Policy: 10 runs
+  AOS GA Classical: 0 runs
+
+Plot saved to: results/combined_visualization/hypervolume_comparison_combined.png
+Done!
+Job completed at Thu May 28 08:20:31 CDT 2026

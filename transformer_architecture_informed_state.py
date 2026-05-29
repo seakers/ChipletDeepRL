@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import autocast
 # from torch.cuda.amp import GradScaler
-from torch.amp import GradScaler
+from torch.cuda.amp import GradScaler
 import math
 from scipy.stats import norm
 
@@ -98,15 +98,15 @@ class Actor(nn.Module):
         self.num_objectives = num_objectives
 
         self.nhead = 2
-        self.dense_dim = 16
-        self.scaler = GradScaler('cuda' if torch.cuda.is_available() else 'cpu')
+        self.dense_dim = 32
+        self.scaler = GradScaler()
         self.clip_ratio = params['clip_ratio']
         
         self.encoder = nn.Linear(1, self.dense_dim)
         self.positional_encoding = PositionalEncoding(self.dense_dim)
         self.transformer_decoder = CustomTransformerDecoder(
             d_model=self.dense_dim,
-            num_layers=1,
+            num_layers=2,
             dim_feedforward=self.dense_dim,
             dropout=0.1
         )
@@ -175,7 +175,7 @@ class Actor(nn.Module):
             x = self.transformer_decoder(x, tgt_mask=mask)
             x = self.output_layers[ind](x)
             if self.des_space[ind]['type'] == 'continuous':
-                x = torch.exp(x)
+                x = torch.exp(torch.clamp(x.float(), min=-10, max=10))
             elif self.des_space[ind]['type'] == 'discrete':
                 x = F.softmax(x, dim=-1)
             else:
@@ -273,7 +273,7 @@ class Actor(nn.Module):
                 (1 + self.clip_ratio) * advantage,
                 (1 - self.clip_ratio) * advantage
             )
-            policy_loss = -torch.mean(torch.min(ratio * torch.t(advantage), min_advantage))
+            policy_loss = -torch.mean(torch.min(ratio * advantage, min_advantage))
 
         self.scaler.scale(policy_loss).backward()
         self.scaler.step(self.optimizer)
@@ -287,7 +287,7 @@ class Actor(nn.Module):
 
 class Critic(nn.Module):
 
-    def __init__(self, device, params, num_objectives, input_dim):
+    def __init__(self, device, params, num_objectives):
 
         super(Critic, self).__init__()
         self.device = device
@@ -295,40 +295,60 @@ class Critic(nn.Module):
 
         self.nhead = 2
         self.dense_dim = 16
-        self.scaler = GradScaler('cuda' if torch.cuda.is_available() else 'cpu')
+        self.scaler = GradScaler()
+        self.clip_ratio = params['clip_ratio']
         self.num_objectives = num_objectives
-        self.input_dim = input_dim
 
-        self.input_layer = nn.Linear(self.input_dim, self.dense_dim)
-        self.hidden_layer = nn.Linear(self.dense_dim, self.dense_dim)
+        self.encoder = nn.Linear(1, self.dense_dim)
+        self.positional_encoding = PositionalEncoding(self.dense_dim)
+        self.transformer_decoder = CustomTransformerDecoder(
+            d_model=self.dense_dim,
+            # nhead=self.nhead,
+            num_layers=1,
+            dim_feedforward=self.dense_dim,
+            dropout=0.1
+        )
         self.output_layer = nn.Linear(self.dense_dim, self.num_objectives)
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=params['learning_rate'])
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=1000, gamma=0.9)
+
+
+    def generate_square_subsequent_mask(self, sz):
+
+        mask = torch.triu(torch.ones(sz, sz), diagonal=1)
+        mask = mask.masked_fill(mask == 1, float('-inf'))
+
+        return mask
     
 
     def forward(self, x):
 
         with autocast(device_type=self.device.type, dtype=torch.float16):
-            x = self.input_layer(x)
-            x = self.hidden_layer(x)
+            x = x.unsqueeze(-1)
+            x = self.encoder(x)
+            x = self.positional_encoding(x)
+            mask = self.generate_square_subsequent_mask(x.size(1)).to(self.device)
+            x = self.transformer_decoder(x, tgt_mask=mask)
             x = self.output_layer(x)
+            x = x[:, -1, :]
 
         return x
     
 
     def sample_critic(self, observation):
-
-        input_observations = []
-        for obs in observation:
-            input_obs = []
-            input_obs.extend(obs)
-            while(len(input_obs)) < self.input_dim:
-                input_obs.extend([0])
-            input_observations.append(input_obs)
-        input_observations = torch.tensor(input_observations, dtype=torch.float32, device=self.device)
-        output = self(input_observations)  # shape: (num components, 5)
-
+        
+        input_observation = torch.tensor(observation, dtype=torch.float32).to(self.device)
+        # Ensure shape is [batch, seq_len] regardless of input nesting
+        if input_observation.dim() == 3 and input_observation.size(0) == 1:
+            input_observation = input_observation.squeeze(0)
+        elif input_observation.dim() == 3:
+            # [batch, 1, seq_len] -> [batch, seq_len]
+            input_observation = input_observation.squeeze(1)
+        elif input_observation.dim() == 1:
+            input_observation = input_observation.unsqueeze(0)
+        output = self(input_observation)
+        
         return output
     
 

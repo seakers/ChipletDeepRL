@@ -1,0 +1,27 @@
+Job started on c066 at Thu May 28 12:25:57 CDT 2026
+Loading primary folder...
+Method Key: random_search
+Method Key: genetic_algorithm
+Method Key: rl_informed_env
+Method Key: warm_start_ga
+Method Key: design_repair
+Method Key: intelligent_mutation_ga
+Method Key: warm_start_intelligent_mutation_ga
+Method Key: aos_ga_classical
+Primary folder loaded.
+Loading GA hybrid split folders...
+  Loading 10 run(s) from results/2026-05-17_11-27-22...
+
+Run counts after aggregation:
+  Random Search: 10 runs
+  Genetic Algorithm: 10 runs
+  RL Informed Env: 10 runs
+  Warm Start GA: 10 runs
+  Design Repair: 10 runs
+  Intelligent Mutation GA: 10 runs
+  Warm Start Intelligent Mutation GA: 10 runs
+  AOS GA Classical: 10 runs
+
+Plot saved to: results/combined_visualization/hypervolume_comparison_combined.png
+Done!
+Job completed at Thu May 28 13:19:32 CDT 2026

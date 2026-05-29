@@ -85,9 +85,9 @@ def run_design_repair(max_values, params, eval_function):
         )
         
         # Store results
-        all_des.extend(epoch_data['des'])
-        all_obj.extend(epoch_data['obj'])
-        all_constraints.extend(epoch_data['constraints'])
+        # all_des.extend(epoch_data['des'])
+        # all_obj.extend(epoch_data['obj'])
+        # all_constraints.extend(epoch_data['constraints'])
         all_constraint_vals.extend(epoch_data['constraint_vals'])
         
         all_actor_loss.append(stats['actor_loss'])
@@ -126,35 +126,29 @@ def run_design_repair(max_values, params, eval_function):
 
 
 def get_models(device, params, num_objectives, num_actions, unique_des_space, comp_list):
-    """
-    Initialize Actor and Critic models for spacecraft design repair.
-    Uses informed state architecture similar to ppo_optimization_informed_state.py
-    """
-    # Actor for spacecraft: needs design space info for variable selection
     actor = Actor(
-        device=device, 
-        params=params, 
+        device=device,
+        params=params,
         des_space=unique_des_space,
         comp_list=comp_list,
         num_objectives=num_objectives,
-        repair_mode=True  # Flag to enable repair-specific behavior
+        repair_mode=True
     )
-    
-    # Critic input: design variables + objectives
+
     critic = Critic(
-        device=device, 
-        params=params, 
-        num_objectives=num_objectives, 
-        input_dim=num_actions
+        device=device,
+        params=params,
+        num_objectives=num_objectives,
+        input_dim=num_actions  # number of design variables
     )
 
     actor.to(device)
     critic.to(device)
-    
-    # Initialize lazy layers
+
+    # Initialize lazy layers with dummy inputs
     input_dummy = torch.zeros((1, num_actions), dtype=torch.float32).to(device)
     actor(input_dummy, 0)
-    critic(input_dummy)
+    critic(input_dummy)  # Now works with transformer: [1, num_actions] -> encoder -> decoder -> output
 
     if params['model_folder'] is not None:
         actor.load_state_dict(torch.load(f"{params['model_folder']}/actor_spacecraft_repair_model.pth"))
@@ -257,10 +251,25 @@ def run_repair_epoch(actor, critic, all_des, all_obj, all_constraints, designs, 
     with torch.no_grad():
         for idx in range(mini_batch_size):
             if len(batch_observations[idx]) > 0:
-                obs_tensor = torch.tensor([batch_observations[idx]], dtype=torch.float32).to(device)
-                values = np.array(critic.sample_critic(obs_tensor).tolist())
-                critic_values[idx] = values
-    
+                # Each observation is one design state [num_design_vars]
+                # Stack all timestep observations: [num_timesteps, num_design_vars]
+                obs_tensor = torch.tensor(
+                    batch_observations[idx], dtype=torch.float32
+                ).to(device)
+                
+                # Forward pass: [num_timesteps, num_objectives]
+                raw_values = critic.sample_critic(obs_tensor)
+                
+                # Weighted sum across objectives to get scalar values per timestep
+                # Use the same weights that were used for rewards
+                w = torch.tensor(
+                    weights[idx], dtype=torch.float32
+                ).to(device)
+                
+                # Aggregate: dot product with weights per timestep -> [num_timesteps]
+                scalar_values = torch.sum(-raw_values * w.unsqueeze(0), dim=-1)
+                critic_values[idx] = scalar_values.cpu().numpy()
+
     # Calculate advantages and returns
     gamma = params['gamma']
     lam = params['lambda']
@@ -387,39 +396,48 @@ def calculate_step_reward_spacecraft(parent_obj, child_obj, is_constrained,
 
 
 def calculate_gae(batch_rewards, batch_values, gamma, lam):
-    """Calculate Generalized Advantage Estimation"""
+    """Calculate Generalized Advantage Estimation.
+    
+    batch_rewards: list of arrays, each [num_timesteps]
+    batch_values: list of arrays, each [num_timesteps] (already scalar-aggregated)
+    """
     mini_batch_size = len(batch_rewards)
     all_advantages = []
     all_returns = []
-    
+
     for idx in range(mini_batch_size):
         if len(batch_rewards[idx]) == 0:
             all_advantages.append(np.array([]))
             all_returns.append(np.array([]))
             continue
-            
+
         rewards = np.array(batch_rewards[idx])
-        values = np.array(batch_values[idx].copy()).flatten()
-        
-        if len(values) < len(rewards):
-            values = np.append(values, values[-1] if len(values) > 0 else 0)
-        values = np.append(values, values[-1])
-        
-        deltas = rewards + gamma * values[1:len(rewards)+1] - values[:len(rewards)]
+        values = np.array(batch_values[idx]).flatten()
+
+        # Bootstrap: append last value for the V(s_{T+1}) term
+        # For repair (episode ends at stop), terminal value = 0 is more appropriate
+        # but keeping last value as a soft bootstrap is fine for non-terminal steps
+        values_plus = np.append(values, 0.0)  # Terminal state value = 0
+
+        deltas = rewards + gamma * values_plus[1:len(rewards)+1] - values_plus[:len(rewards)]
         advantages = discounted_cumulative_sums(deltas, gamma * lam)
         returns = discounted_cumulative_sums(rewards, gamma)
-        
+
         all_advantages.append(advantages)
         all_returns.append(returns)
-    
-    # Normalize advantages
+
+    # Normalize advantages across entire batch
     all_advantages_flat = np.concatenate([a for a in all_advantages if len(a) > 0])
-    if len(all_advantages_flat) > 0:
-        adv_mean, adv_std = np.mean(all_advantages_flat), np.std(all_advantages_flat)
-        all_advantages = [(adv - adv_mean) / (adv_std + 1e-8) if len(adv) > 0 else adv 
-                          for adv in all_advantages]
-    
+    if len(all_advantages_flat) > 1:
+        adv_mean = np.mean(all_advantages_flat)
+        adv_std = np.std(all_advantages_flat)
+        all_advantages = [
+            (adv - adv_mean) / (adv_std + 1e-8) if len(adv) > 0 else adv
+            for adv in all_advantages
+        ]
+
     return all_advantages, all_returns
+
 
 def generate_initial_designs(all_des, all_obj, all_constraints, eval_function, 
                              des_space, num_designs, num_actions, NFE):
@@ -624,34 +642,27 @@ def calculate_pareto_progress(all_des, all_obj, all_constraints, hv_obj, hv_ind,
 
 def plot_training_results(actor_loss, critic_loss, kl, avg_reward, params):
     """Plot training metrics - same for both problems"""
-    plt.figure(figsize=(20, 5))
+    plt.figure(figsize=(15, 5))
     
-    plt.subplot(1, 4, 1)
-    plt.plot(actor_loss)
-    plt.title('Actor Loss')
+    plt.subplot(1, 3, 1)
+    plt.plot(actor_loss, label='Actor Loss', color='blue')
+    plt.title('Actor Loss vs Epochs')
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
     plt.grid(True)
     
-    plt.subplot(1, 4, 2)
-    plt.plot(critic_loss)
-    plt.title('Critic Loss')
+    plt.subplot(1, 3, 2)
+    plt.plot(critic_loss, label='Critic Loss', color='orange')
+    plt.title('Critic Loss vs Epochs')
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
     plt.grid(True)
     
-    plt.subplot(1, 4, 3)
-    plt.plot(kl)
-    plt.title('KL Divergence')
+    plt.subplot(1, 3, 3)
+    plt.plot(kl, label='KL Divergence', color='green')
+    plt.title('KL Divergence vs Epochs')
     plt.xlabel('Epoch')
     plt.ylabel('KL')
-    plt.grid(True)
-    
-    plt.subplot(1, 4, 4)
-    plt.plot(avg_reward)
-    plt.title('Avg Reward per Episode')
-    plt.xlabel('Epoch')
-    plt.ylabel('Reward')
     plt.grid(True)
     
     plt.tight_layout()

@@ -8,7 +8,7 @@ from transformer_architecture_informed_state import Actor, Critic
 def get_models(num_actions, device, params, unique_des_space, num_objectives, comp_list):
     # Add num_objectives parameter to Actor constructor
     actor = Actor(device=device, params=params, des_space=unique_des_space, comp_list=comp_list, num_objectives=num_objectives)
-    critic = Critic(device=device, params=params, num_objectives=num_objectives, input_dim=num_objectives+num_actions)
+    critic = Critic(device=device, params=params, num_objectives=num_objectives)
 
     actor.to(device)
     critic.to(device)

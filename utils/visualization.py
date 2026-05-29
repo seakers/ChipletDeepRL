@@ -13,7 +13,7 @@ def config_visualization(struct_panels, component_list, date_str, method):
     ax.set_xlim(-1, 1)
     ax.set_ylim(-1, 1)
     ax.set_zlim(-1, 1)
-    ax.set_aspect('equal')
+    # ax.set_aspect('equal')
 
     # objColor = tuple(np.random.rand(len(component_list), 3))
 

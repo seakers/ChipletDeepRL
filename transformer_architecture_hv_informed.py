@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import autocast
 # from torch.cuda.amp import GradScaler
-from torch.amp import GradScaler
+from torch.cuda.amp import GradScaler
 import math
 from scipy.stats import norm
 
@@ -99,7 +99,7 @@ class Actor(nn.Module):
 
         self.nhead = 2
         self.dense_dim = 16
-        self.scaler = GradScaler('cuda' if torch.cuda.is_available() else 'cpu')
+        self.scaler = GradScaler()
         self.clip_ratio = params['clip_ratio']
         
         self.encoder = nn.Linear(1, self.dense_dim)
@@ -304,7 +304,7 @@ class Critic(nn.Module):
 
         self.nhead = 2
         self.dense_dim = 16
-        self.scaler = GradScaler('cuda' if torch.cuda.is_available() else 'cpu')
+        self.scaler = GradScaler()
         self.num_objectives = num_objectives
         self.input_dim = input_dim  # Now includes Pareto front state size
 

@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import autocast
-from torch.amp import GradScaler
+from torch.cuda.amp import GradScaler
 import math
 
 
@@ -26,6 +26,54 @@ class PositionalEncoding(nn.Module):
         return self.dropout(x)
 
 
+class CustomDecoderLayer(nn.Module):
+
+    def __init__(self, d_model, dim_feedforward=64, dropout=0.1):
+        super(CustomDecoderLayer, self).__init__()
+
+        self.linear1 = nn.Linear(d_model, dim_feedforward)
+        self.dropout = nn.Dropout(dropout)
+        self.linear2 = nn.Linear(dim_feedforward, d_model)
+
+        self.norm1 = nn.LayerNorm(d_model)
+        self.norm2 = nn.LayerNorm(d_model)
+        self.norm3 = nn.LayerNorm(d_model)
+
+        self.dropout1 = nn.Dropout(dropout)
+        self.dropout2 = nn.Dropout(dropout)
+        self.dropout3 = nn.Dropout(dropout)
+
+    def forward(self, tgt, tgt_mask=None):
+        # Self-attention
+        tgt2 = F.scaled_dot_product_attention(tgt, tgt, tgt, tgt_mask)
+        tgt = tgt + self.dropout1(tgt2)
+        tgt = self.norm1(tgt)
+
+        # Feed-forward
+        tgt2 = self.linear2(self.dropout(F.relu(self.linear1(tgt))))
+        tgt = tgt + self.dropout3(tgt2)
+        tgt = self.norm3(tgt)
+
+        return tgt
+
+
+class CustomTransformerDecoder(nn.Module):
+
+    def __init__(self, d_model, num_layers, dim_feedforward=64, dropout=0.1):
+        super(CustomTransformerDecoder, self).__init__()
+        self.layers = nn.ModuleList([
+            CustomDecoderLayer(d_model, dim_feedforward, dropout)
+            for _ in range(num_layers)
+        ])
+        self.num_layers = num_layers
+
+    def forward(self, tgt, tgt_mask=None):
+        output = tgt
+        for layer in self.layers:
+            output = layer(output, tgt_mask)
+        return output
+
+
 class Actor(nn.Module):
     """
     Design repair actor for spacecraft configuration.
@@ -47,11 +95,11 @@ class Actor(nn.Module):
         self.repair_mode = repair_mode
         
         self.num_variables = len(des_space)
-        self.dense_dim = params.get('dense_dim', 16)
+        self.dense_dim = params.get('dense_dim', 32)
         self.nhead = 2
         self.num_layers = 2
         self.clip_ratio = params['clip_ratio']
-        self.scaler = GradScaler('cuda' if torch.cuda.is_available() else 'cpu')
+        self.scaler = GradScaler()
         
         # Input dimension: design variables + objectives
         self.input_dim = self.num_variables + num_objectives
@@ -392,115 +440,131 @@ class Actor(nn.Module):
 
 class Critic(nn.Module):
     """
-    Value network for spacecraft design repair.
-    Estimates expected return from current design state.
-    Supports weighted multi-objective evaluation similar to [3].
+    Transformer-based value network for spacecraft design repair.
+    Mirrors the architecture from transformer_architecture_informed_state.py [3]
+    but adapted for repair context where we see the full design at each step.
     """
-    
+
     def __init__(self, device, params, num_objectives, input_dim):
         super(Critic, self).__init__()
         self.device = device
         self.params = params
         self.num_objectives = num_objectives
         self.input_dim = input_dim
-        
-        self.dense_dim = params.get('dense_dim', 16)
-        self.scaler = GradScaler('cuda' if torch.cuda.is_available() else 'cpu')
-        
-        # Input layer to match spacecraft design space dimensions [3]
-        self.input_layer = nn.Linear(self.input_dim, self.dense_dim)
-        self.hidden_layer = nn.Linear(self.dense_dim, self.dense_dim)
-        # Output per objective for weighted aggregation [3]
+
+        self.dense_dim = 16  # Match [3]
+        self.scaler = GradScaler()
+        self.clip_ratio = params['clip_ratio']
+
+        # Transformer layers - same structure as informed_state critic [3]
+        self.encoder = nn.Linear(1, self.dense_dim)
+        self.positional_encoding = PositionalEncoding(self.dense_dim)
+        self.transformer_decoder = CustomTransformerDecoder(
+            d_model=self.dense_dim,
+            num_layers=1,
+            dim_feedforward=self.dense_dim,
+            dropout=0.1
+        )
         self.output_layer = nn.Linear(self.dense_dim, self.num_objectives)
-        
+
         self.optimizer = torch.optim.Adam(self.parameters(), lr=params['learning_rate'])
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=1000, gamma=0.9)
-    
-    
+
+    def generate_square_subsequent_mask(self, sz):
+        """Causal mask so position i can only attend to positions <= i [3]."""
+        mask = torch.triu(torch.ones(sz, sz), diagonal=1)
+        mask = mask.masked_fill(mask == 1, float('-inf'))
+        return mask
+
     def forward(self, x):
         """
-        x: [batch, input_dim] - design variables + objectives
-        Returns: value estimates [batch, num_objectives]
+        x: [batch, seq_len] - encoded design state
+        Returns: [batch, num_objectives] - value estimate per objective
         """
         with autocast(device_type=self.device.type, dtype=torch.float16):
-            x = F.relu(self.input_layer(x))
-            x = F.relu(self.hidden_layer(x))
-            x = self.output_layer(x)
+            x = x.unsqueeze(-1)                    # [batch, seq_len, 1]
+            x = self.encoder(x)                     # [batch, seq_len, dense_dim]
+            x = self.positional_encoding(x)         # [batch, seq_len, dense_dim]
+            mask = self.generate_square_subsequent_mask(x.size(1)).to(self.device)
+            x = self.transformer_decoder(x, tgt_mask=mask)  # [batch, seq_len, dense_dim]
+            x = self.output_layer(x)                # [batch, seq_len, num_objectives]
+            x = x[:, -1, :]                         # [batch, num_objectives] - last position
         return x
-    
-    
+
     def sample_critic(self, observation):
         """
-        Evaluate value for batch of design states.
-        Handles variable-length observations by padding [3].
+        Evaluate value for design states.
         
-        observation: list of observations or tensor
-        Returns: value estimates [batch, num_objectives]
+        observation: tensor of shape [batch, seq_len] or [timesteps, seq_len]
+                     Each row is one encoded design state.
+        Returns: [batch, num_objectives]
         """
         if isinstance(observation, list):
+            # Handle list of observations by padding to input_dim
             input_observations = []
             for obs in observation:
                 input_obs = list(obs) if not isinstance(obs, list) else obs.copy()
-                # Pad to input_dim if needed [3]
                 while len(input_obs) < self.input_dim:
                     input_obs.append(0)
                 input_observations.append(input_obs[:self.input_dim])
             observation = torch.tensor(input_observations, dtype=torch.float32, device=self.device)
         elif not isinstance(observation, torch.Tensor):
             observation = torch.tensor(observation, dtype=torch.float32, device=self.device)
-        
+
         if observation.device != self.device:
             observation = observation.to(self.device)
-            
+
+        # Ensure 2D: [batch, seq_len]
+        if observation.dim() == 3:
+            # If [1, timesteps, features], reshape to [timesteps, features]
+            observation = observation.squeeze(0)
+        elif observation.dim() == 1:
+            observation = observation.unsqueeze(0)
+
         return self.forward(observation)
-    
-    
+
     def ppo_update(self, design_states, returns, weights=None):
         """
-        Update critic with PPO.
-        Supports weighted multi-objective returns [3].
-        
-        design_states: list of tensors [timesteps, input_dim]
-        returns: list of tensors [timesteps]
-        weights: optional weights for multi-objective aggregation [3]
+        Update critic using MSE loss between predicted and actual returns.
+        Supports weighted multi-objective aggregation [3].
+
+        design_states: list of tensors, each [timesteps, input_dim]
+        returns: list of tensors, each [timesteps]
+        weights: optional list of weight tensors for multi-objective aggregation
         """
         self.optimizer.zero_grad()
         value_losses = []
-        
+
         with autocast(device_type=self.device.type, dtype=torch.float16):
             for idx in range(len(design_states)):
                 if design_states[idx].size(0) == 0:
                     continue
-                    
+
                 predicted_values = self.forward(design_states[idx])  # [timesteps, num_objectives]
-                
+
                 if weights is not None and len(weights) > idx:
-                    # Weighted aggregation of predicted values [3]
                     batch_weights = weights[idx]
                     if not isinstance(batch_weights, torch.Tensor):
                         batch_weights = torch.tensor(batch_weights, dtype=torch.float32, device=self.device)
-                    
-                    # Expand weights if needed
                     if batch_weights.dim() == 1:
                         batch_weights = batch_weights.unsqueeze(0).expand(predicted_values.size(0), -1)
-                    
+
                     predicted_reward = torch.sum(-predicted_values * batch_weights, dim=-1)
                 else:
-                    # Simple mean across objectives if no weights provided
+                    # Scalar value: mean across objectives
                     predicted_reward = predicted_values.mean(dim=-1)
-                
-                # MSE loss against returns [5]
+
                 value_loss = (predicted_reward - returns[idx]) ** 2
                 value_losses.append(value_loss)
-            
+
             if len(value_losses) == 0:
                 return 0.0
-                
+
             value_loss = torch.cat(value_losses).mean()
-        
+
         self.scaler.scale(value_loss).backward()
         self.scaler.step(self.optimizer)
         self.scaler.update()
         self.scheduler.step()
-        
+
         return value_loss.item()

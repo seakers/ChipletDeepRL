@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import autocast
 # from torch.cuda.amp import GradScaler
-from torch.amp import GradScaler
+from torch.cuda.amp import GradScaler
 import math
 from scipy.stats import norm
 
@@ -120,7 +120,7 @@ class Actor(nn.Module):
             self.heads.append(head_layers)
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=params['learning_rate'])
-        self.scaler = GradScaler('cuda' if torch.cuda.is_available() else 'cpu')
+        self.scaler = GradScaler()
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=1000, gamma=0.9)
 
 
@@ -296,7 +296,7 @@ class Critic(nn.Module):
 
         self.nhead = 2
         self.dense_dim = 16
-        self.scaler = GradScaler('cuda' if torch.cuda.is_available() else 'cpu')
+        self.scaler = GradScaler()
         self.num_objectives = num_objectives
         self.input_dim = input_dim
 
