@@ -14,6 +14,7 @@ def run_random_search(params, eval_function):
     all_des = []
     all_obj = []
     all_constraints = []
+    all_constraint_vals = []
     NFE = 0
     hv_grid = HypervolumeGrid(refPoint=[1.0]*num_objectives)
 
@@ -41,17 +42,19 @@ def run_random_search(params, eval_function):
             else:
                 print("INVALID DESIGN SPACE")
 
-        objectives, constraints = eval_function.evaluate(design)
+        objectives, constraints, constraint_vals = eval_function.evaluate(design)
         # if not constraints:
         #     print(f"Found a valid design! Random search, execution {run+1}: Design: {design}, Objectives: {objectives}")
         all_des.append(design)
         all_obj.append(objectives)
         all_constraints.append(constraints)
+        all_constraint_vals.append(constraint_vals)
         NFE += 1
 
     all_des = np.array(all_des)
     all_obj = np.array(all_obj)
     all_constraints = np.array(all_constraints, dtype=bool)
+    all_constraint_vals = np.array(all_constraint_vals)
 
     max_values = np.max(all_obj, axis=0) * 3.0 + 1e-6  # Add a small epsilon to avoid division by zero
     all_obj[all_constraints] = max_values

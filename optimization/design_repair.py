@@ -6,14 +6,14 @@ from pymoo.indicators.hv import HV
 from copy import deepcopy
 
 from utils.hypervolume_utils import is_pareto_efficient
-from transformer_design_repair import Actor, Critic
+from optimization.transformer_design_repair import Actor, Critic
 
 
 def discounted_cumulative_sums(x, discount):
     return scipy.signal.lfilter([1], [1, float(-discount)], x[::-1], axis=0)[::-1]
 
 
-def run_design_repair(max_values, params, eval_function):
+def run_design_repair(max_values, params, eval_function, run_idx=0, best_hv_so_far=-np.inf):
     """
     Run PPO for design repair on spacecraft configuration: 
     modify existing designs one variable at a time.
@@ -55,23 +55,24 @@ def run_design_repair(max_values, params, eval_function):
         if NFE == 0:
             # Generate initial random designs
             print("Generating initial designs...")
-            initial_designs, initial_objs, all_des, all_obj, all_constraints, NFE = generate_initial_designs(
-                all_des, all_obj, all_constraints, 
+            initial_designs, initial_objs, all_des, all_obj, all_constraints, all_constraint_vals, NFE = generate_initial_designs(
+                all_des, all_obj, all_constraints, all_constraint_vals,
                 eval_function, des_space, mini_batch_size, num_actions, NFE
             )
         else:
-            initial_designs, initial_objs, all_des, all_obj, all_constraints, NFE = sample_next_batch(
-                all_des, all_obj, all_constraints, 
+            initial_designs, initial_objs, all_des, all_obj, all_constraints, all_constraint_vals, NFE = sample_next_batch(
+                all_des, all_obj, all_constraints, all_constraint_vals,
                 eval_function, des_space, mini_batch_size, num_actions, NFE
             )
         
         # Run epoch with current batch of designs
-        epoch_data, stats, all_des, all_obj, all_constraints, NFE = run_repair_epoch(
+        epoch_data, stats, all_des, all_obj, all_constraints, all_constraint_vals, NFE = run_repair_epoch(
             actor,
             critic,
             all_des,
             all_obj,
             all_constraints,
+            all_constraint_vals,
             initial_designs,
             initial_objs,
             eval_function,
@@ -117,12 +118,24 @@ def run_design_repair(max_values, params, eval_function):
         all_des, all_obj, all_constraints, hv_obj, hv_ind, NFE
     )
     
-    # Save and plot results
-    torch.save(actor.state_dict(), f'results/{params["date_str"]}/actor_spacecraft_repair_model.pth')
-    torch.save(critic.state_dict(), f'results/{params["date_str"]}/critic_spacecraft_repair_model.pth')
-    plot_training_results(all_actor_loss, all_critic_loss, all_kl, all_avg_reward, params)
+    # ── Best-HV model saving ──────────────────────────────────────────────────
+    run_best_hv = hypervolumes[-1] if hypervolumes else 0.0
+
+    # Always save the latest model (main() will copy to best_* if it wins)
+    torch.save(actor.state_dict(),
+               f'results/{params["date_str"]}/actor_spacecraft_repair_model.pth')
+    torch.save(critic.state_dict(),
+               f'results/{params["date_str"]}/critic_spacecraft_repair_model.pth')
+
+    print(f"  [Design Repair] Run HV = {run_best_hv:.6f} | "
+          f"Best so far = {best_hv_so_far:.6f}")
+
+    plot_training_results(
+        all_actor_loss, all_critic_loss, all_kl, all_avg_reward, params,
+        suffix=f"_run{run_idx}"   # avoids overwriting plots from previous runs
+    )
     
-    return all_des, all_obj, pareto_front_des, pareto_front_obj, hypervolumes, NFE
+    return all_des, all_obj, pareto_front_des, pareto_front_obj, hypervolumes, NFE, run_best_hv
 
 
 def get_models(device, params, num_objectives, num_actions, unique_des_space, comp_list):
@@ -158,7 +171,7 @@ def get_models(device, params, num_objectives, num_actions, unique_des_space, co
     return actor, critic
 
 
-def run_repair_epoch(actor, critic, all_des, all_obj, all_constraints, designs, objs, 
+def run_repair_epoch(actor, critic, all_des, all_obj, all_constraints, all_constraint_vals, designs, objs, 
                      eval_function, des_space, mini_batch_size, NFE, max_objectives, 
                      min_mask, device, params):
     """
@@ -204,17 +217,17 @@ def run_repair_epoch(actor, critic, all_des, all_obj, all_constraints, designs, 
             new_design[var_idx.item()] = decode_action_to_value(
                 int(value_idx.item()), int(var_idx.item()), des_space
             )
+
+            new_design = repair_invalid_panels(new_design, eval_function)  # Repair step to ensure valid panel choices
             
             # Evaluate new design
-            new_obj, is_constrained = eval_function.evaluate(new_design)
+            new_obj, is_constrained, new_constraint_vals = eval_function.evaluate(new_design)
             NFE += 1
-            
-            # Handle constraint values if available
-            new_constraint_vals = []  # Spacecraft problem may not have detailed constraints
 
             all_des.append(new_design)
             all_obj.append(new_obj)
             all_constraints.append(is_constrained)
+            all_constraint_vals.append(new_constraint_vals)
             
             epoch_des.append(new_design)
             epoch_obj.append(new_obj)
@@ -225,6 +238,7 @@ def run_repair_epoch(actor, critic, all_des, all_obj, all_constraints, designs, 
             reward = calculate_step_reward_spacecraft(
                 current_obj, new_obj, 
                 is_constrained,
+                new_constraint_vals,
                 max_objectives,
                 weights[idx],
                 min_mask, 
@@ -330,7 +344,7 @@ def run_repair_epoch(actor, critic, all_des, all_obj, all_constraints, designs, 
         'avg_reward': avg_reward
     }
     
-    return epoch_data, stats, all_des, all_obj, all_constraints, NFE
+    return epoch_data, stats, all_des, all_obj, all_constraints, all_constraint_vals, NFE
 
 
 def encode_design(design, des_space):
@@ -363,7 +377,7 @@ def decode_action_to_value(action_idx, var_idx, des_space):
         return des_space[var_idx]['range'][action_idx]
 
 
-def calculate_step_reward_spacecraft(parent_obj, child_obj, is_constrained, 
+def calculate_step_reward_spacecraft(parent_obj, child_obj, is_constrained, new_constraint_vals,
                                       max_objectives, weights, min_mask, params):
     """
     Calculate reward for a single modification step for spacecraft design.
@@ -372,7 +386,7 @@ def calculate_step_reward_spacecraft(parent_obj, child_obj, is_constrained,
     step_penalty = params.get('step_penalty', 0.01)
     
     if is_constrained:
-        return np.dot(weights, -np.ones_like(np.array(max_objectives))) - step_penalty
+        return np.dot(weights, -np.ones_like(np.array(max_objectives))) - np.sum(new_constraint_vals) - step_penalty
     
     # Normalize objectives
     parent_arr = np.array(parent_obj)
@@ -439,7 +453,24 @@ def calculate_gae(batch_rewards, batch_values, gamma, lam):
     return all_advantages, all_returns
 
 
-def generate_initial_designs(all_des, all_obj, all_constraints, eval_function, 
+def repair_invalid_panels(solution, eval_function):
+    structure_id = int(solution[0])
+    shelves = int(solution[4])
+    base_panels = {0: 5, 1: 6, 2: 8}[structure_id]
+    valid_panels = list(range(base_panels))
+    shelf_panels =  [i+8 for i in range(shelves)]
+    shelf_panels += [i+11 for i in range(shelves)]
+    for ind in range(5, len(solution), 5):
+        if not eval_function.component_list[ind//5 - 1].pointing:
+            valid_panels_temp = valid_panels + shelf_panels
+        else:
+            valid_panels_temp = valid_panels
+        if solution[ind] not in valid_panels_temp:
+            solution[ind] = np.random.choice(valid_panels_temp)
+    return solution
+
+
+def generate_initial_designs(all_des, all_obj, all_constraints, all_constraint_vals, eval_function, 
                              des_space, num_designs, num_actions, NFE):
     """
     Generate random initial designs for spacecraft configuration.
@@ -470,24 +501,25 @@ def generate_initial_designs(all_des, all_obj, all_constraints, eval_function,
             else:
                 print("INVALID DESIGN SPACE")
         
-        # Evaluate the design (spacecraft eval returns 2 values, not 3)
-        objs, is_constrained = eval_function.evaluate(design)
+        # Evaluate the design 
+        objs, is_constrained, constraint_vals = eval_function.evaluate(design)
         NFE += 1
         
         # Track all designs (including invalid ones for learning)
         all_des.append(design)
         all_obj.append(objs)
         all_constraints.append(is_constrained)
+        all_constraint_vals.append(constraint_vals)
         
         # Only keep valid designs for initial batch
         if not is_constrained:
             valid_designs.append(design)
             obj_values.append(objs)
             
-    return valid_designs, obj_values, all_des, all_obj, all_constraints, NFE
+    return valid_designs, obj_values, all_des, all_obj, all_constraints, all_constraint_vals, NFE
 
 
-def sample_next_batch(all_des, all_obj, all_constraints, eval_function, 
+def sample_next_batch(all_des, all_obj, all_constraints, all_constraint_vals, eval_function, 
                       des_space, num_designs, num_actions, NFE):
     """
     Sample designs for next epoch (mix of random and good previous designs).
@@ -525,14 +557,15 @@ def sample_next_batch(all_des, all_obj, all_constraints, eval_function,
             else:
                 print("INVALID DESIGN SPACE")
         
-        objs, is_constrained = eval_function.evaluate(design)
+        objs, is_constrained, constraint_vals = eval_function.evaluate(design)
         NFE += 1
         attempts += 1
         
         all_des.append(design)
         all_obj.append(objs)
         all_constraints.append(is_constrained)
-        
+        all_constraint_vals.append(constraint_vals)
+
         if not is_constrained:
             designs.append(design)
             obj_values.append(objs)
@@ -581,19 +614,20 @@ def sample_next_batch(all_des, all_obj, all_constraints, eval_function,
             else:
                 print("INVALID DESIGN SPACE")
         
-        objs, is_constrained = eval_function.evaluate(design)
+        objs, is_constrained, constraint_vals = eval_function.evaluate(design)
         NFE += 1
         fill_attempts += 1
         
         all_des.append(design)
         all_obj.append(objs)
         all_constraints.append(is_constrained)
+        all_constraint_vals.append(constraint_vals)
         
         if not is_constrained:
             designs.append(design)
             obj_values.append(objs)
     
-    return designs, obj_values, all_des, all_obj, all_constraints, NFE
+    return designs, obj_values, all_des, all_obj, all_constraints, all_constraint_vals, NFE
 
 
 def calculate_pareto_progress(all_des, all_obj, all_constraints, hv_obj, hv_ind, NFE):
@@ -640,7 +674,7 @@ def calculate_pareto_progress(all_des, all_obj, all_constraints, hv_obj, hv_ind,
     return pareto_front_des, pareto_front_obj, hypervolumes
 
 
-def plot_training_results(actor_loss, critic_loss, kl, avg_reward, params):
+def plot_training_results(actor_loss, critic_loss, kl, avg_reward, params, suffix):
     """Plot training metrics - same for both problems"""
     plt.figure(figsize=(15, 5))
     
@@ -666,5 +700,5 @@ def plot_training_results(actor_loss, critic_loss, kl, avg_reward, params):
     plt.grid(True)
     
     plt.tight_layout()
-    plt.savefig(f"results/{params['date_str']}/spacecraft_repair_training_results.png")
+    plt.savefig(f"results/{params['date_str']}/spacecraft_repair_training_results{suffix}.png")
     plt.close()

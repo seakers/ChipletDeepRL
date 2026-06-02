@@ -3,7 +3,7 @@ import pygad
 import torch
 
 from utils.hypervolume_utils import HypervolumeGrid
-from transformer_design_repair import Actor
+from optimization.transformer_design_repair import Actor
 
 def run_intelligent_mutation_ga(max_obj, params, eval_function):
     """
@@ -37,6 +37,7 @@ def run_intelligent_mutation_ga(max_obj, params, eval_function):
     all_des = []
     all_obj = []
     all_constraints = []
+    all_constraint_vals = []
     NFE = 0
     hv_grid = HypervolumeGrid(refPoint=[1.0]*num_objectives)
 
@@ -60,18 +61,19 @@ def run_intelligent_mutation_ga(max_obj, params, eval_function):
     def fitness_func(ga_instance, solution, solution_idx):
         # print(f"Evaluating solution {solution}")
         solution = repair_invalid_panels(solution)
-        objectives, constraints = eval_function.evaluate(solution)
+        objectives, constraints, constraint_vals = eval_function.evaluate(solution)
         # print(f"Objectives: {objectives}")
-        nonlocal all_des, all_obj, all_constraints, NFE
+        nonlocal all_des, all_obj, all_constraints, NFE, all_constraint_vals
         all_des.append(solution)
         all_obj.append(objectives)
         all_constraints.append(constraints)
+        all_constraint_vals.append(constraint_vals)
         NFE += 1
         if constraints:
-            return -max_obj
+            return -np.array(np.append(max_obj,constraint_vals), dtype=float)
         else:
             # print(f"Found a valid design! Genetic Algorithm: Design: {solution}, Objectives: {objectives}")
-            return -np.array(objectives)
+            return -np.array(objectives + [constraint_vals], dtype=float)
 
     def on_generation(ga_instance):
         if ga_instance.generations_completed % 10 == 0:
@@ -127,6 +129,7 @@ def run_intelligent_mutation_ga(max_obj, params, eval_function):
     all_des = np.array(all_des)
     all_obj = np.array(all_obj)
     all_constraints = np.array(all_constraints, dtype=bool)
+    all_constraint_vals = np.array(all_constraint_vals)
     all_obj[all_constraints] = max_obj
     print(f"Number of valid designs (False in all_constraints): {np.sum(all_constraints == False)}")
     

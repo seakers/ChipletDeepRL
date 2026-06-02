@@ -13,12 +13,12 @@ from utils.evaluation import Chiplet_Configuration_Design
 from utils.component_classes import StructPanel
 
 # Reuse directly from design_repair [3]
-from design_repair import (
+from optimization.design_repair import (
     get_models, run_repair_epoch, generate_initial_designs,
     sample_next_batch, calculate_pareto_progress, plot_training_results,
     encode_design
 )
-from transfer_learning_informed_state import _estimate_max_objectives
+from optimization.transfer_learning_informed_state import _estimate_max_objectives
 
 
 def run_transfer_learning_design_repair(max_values, params, eval_function):
@@ -34,8 +34,8 @@ def run_transfer_learning_design_repair(max_values, params, eval_function):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    from utils.component_list import getComponents
-    _, transfer_component_sets = getComponents()
+    from utils.component_list import create_varied_components
+    transfer_component_sets = create_varied_components(num_sets=10)
 
     if transfer_component_sets is None or len(transfer_component_sets) == 0:
         raise ValueError(
@@ -55,10 +55,11 @@ def run_transfer_learning_design_repair(max_values, params, eval_function):
     min_mask = np.array([om.lower() == 'min' for om in objective_min_max])
 
     # Budget split
-    pretrain_fraction = params.get('transfer_pretrain_fraction', 0.3)
+    # pretrain_fraction = params.get('transfer_pretrain_fraction', 0.5)
     total_nfe_budget = epochs * mini_batch_size
-    pretrain_nfe_total = int(total_nfe_budget * pretrain_fraction)
-    pretrain_nfe_per_set = max(mini_batch_size, pretrain_nfe_total // len(transfer_component_sets))
+    # pretrain_nfe_total = int(total_nfe_budget * pretrain_fraction)
+    # pretrain_nfe_per_set = max(mini_batch_size, pretrain_nfe_total // len(transfer_component_sets))
+    pretrain_nfe_per_set = 5000 # 5000 # Fixed pre-training NFE per transfer set based on when we see convergence in experiments. Adjust as needed.
 
     # ============================================================
     # Phase 1: Pre-training
@@ -85,24 +86,24 @@ def run_transfer_learning_design_repair(max_values, params, eval_function):
         transfer_des_space = transfer_eval.design_space
 
         pt_NFE = 0
-        pt_des, pt_obj, pt_con = [], [], []
+        pt_des, pt_obj, pt_con, pt_con_val = [], [], [], []
 
         while pt_NFE < pretrain_nfe_per_set:
             if pt_NFE == 0:
-                initial_designs, initial_objs, pt_des, pt_obj, pt_con, pt_NFE = \
+                initial_designs, initial_objs, pt_des, pt_obj, pt_con, pt_con_val, pt_NFE = \
                     generate_initial_designs(
-                        pt_des, pt_obj, pt_con, transfer_eval,
+                        pt_des, pt_obj, pt_con, pt_con_val, transfer_eval,
                         transfer_des_space, mini_batch_size, num_actions, pt_NFE
                     )
             else:
-                initial_designs, initial_objs, pt_des, pt_obj, pt_con, pt_NFE = \
+                initial_designs, initial_objs, pt_des, pt_obj, pt_con, pt_con_val, pt_NFE = \
                     sample_next_batch(
-                        pt_des, pt_obj, pt_con, transfer_eval,
+                        pt_des, pt_obj, pt_con, pt_con_val, transfer_eval,
                         transfer_des_space, mini_batch_size, num_actions, pt_NFE
                     )
 
-            epoch_data, stats, pt_des, pt_obj, pt_con, pt_NFE = run_repair_epoch(
-                actor, critic, pt_des, pt_obj, pt_con,
+            epoch_data, stats, pt_des, pt_obj, pt_con, pt_con_val, pt_NFE = run_repair_epoch(
+                actor, critic, pt_des, pt_obj, pt_con, pt_con_val,
                 initial_designs, initial_objs, transfer_eval,
                 transfer_des_space, mini_batch_size, pt_NFE,
                 transfer_max_obj, min_mask, device, params
@@ -111,7 +112,7 @@ def run_transfer_learning_design_repair(max_values, params, eval_function):
             if pt_NFE % (mini_batch_size * 50) < mini_batch_size:
                 print(f"  Pre-train NFE: {pt_NFE}/{pretrain_nfe_per_set}")
 
-        del transfer_eval, pt_des, pt_obj, pt_con
+        del transfer_eval, pt_des, pt_obj, pt_con, pt_con_val
         gc.collect()
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
@@ -126,7 +127,7 @@ def run_transfer_learning_design_repair(max_values, params, eval_function):
     # ============================================================
     # Phase 2: Fine-tuning on actual problem
     # ============================================================
-    finetune_nfe_budget = total_nfe_budget - pretrain_nfe_total
+    finetune_nfe_budget = total_nfe_budget
     print(f"\nPHASE 2: Fine-tuning for ~{finetune_nfe_budget} NFE on actual problem")
 
     # Reset optimizers with lower LR
@@ -138,7 +139,7 @@ def run_transfer_learning_design_repair(max_values, params, eval_function):
 
     # Standard design repair loop — identical to run_design_repair [3]
     NFE = 0
-    all_des, all_obj, all_constraints = [], [], []
+    all_des, all_obj, all_constraints, all_constraint_vals = [], [], [], []
     all_actor_loss, all_critic_loss, all_avg_reward, all_kl = [], [], [], []
 
     ref_point = np.ones(num_objectives)
@@ -146,20 +147,20 @@ def run_transfer_learning_design_repair(max_values, params, eval_function):
 
     while NFE < finetune_nfe_budget:
         if NFE == 0:
-            initial_designs, initial_objs, all_des, all_obj, all_constraints, NFE = \
+            initial_designs, initial_objs, all_des, all_obj, all_constraints, all_constraint_vals, NFE = \
                 generate_initial_designs(
-                    all_des, all_obj, all_constraints, eval_function,
+                    all_des, all_obj, all_constraints, all_constraint_vals, eval_function,
                     des_space, mini_batch_size, num_actions, NFE
                 )
         else:
-            initial_designs, initial_objs, all_des, all_obj, all_constraints, NFE = \
+            initial_designs, initial_objs, all_des, all_obj, all_constraints, all_constraint_vals, NFE = \
                 sample_next_batch(
-                    all_des, all_obj, all_constraints, eval_function,
+                    all_des, all_obj, all_constraints, all_constraint_vals, eval_function,
                     des_space, mini_batch_size, num_actions, NFE
                 )
 
-        epoch_data, stats, all_des, all_obj, all_constraints, NFE = run_repair_epoch(
-            actor, critic, all_des, all_obj, all_constraints,
+        epoch_data, stats, all_des, all_obj, all_constraints, all_constraint_vals, NFE = run_repair_epoch(
+            actor, critic, all_des, all_obj, all_constraints, all_constraint_vals,
             initial_designs, initial_objs, eval_function,
             des_space, mini_batch_size, NFE,
             max_objectives, min_mask, device, params
@@ -168,6 +169,7 @@ def run_transfer_learning_design_repair(max_values, params, eval_function):
         all_des.extend(epoch_data['des'])
         all_obj.extend(epoch_data['obj'])
         all_constraints.extend(epoch_data['constraints'])
+        all_constraint_vals.extend(epoch_data['constraint_vals'])
 
         all_actor_loss.append(stats['actor_loss'])
         all_critic_loss.append(stats['critic_loss'])

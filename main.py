@@ -1,3 +1,5 @@
+import shutil
+
 import numpy as np
 import matplotlib.pyplot as plt
 import datetime
@@ -8,21 +10,22 @@ import gc
 import torch
 import json
 
-from ppo_optimization_random import run_ppo_optimization_random
-from ppo_optimization_informed_state import run_ppo_optimization_informed_state
-from ppo_optimization_informed_attn import run_ppo_optimization_informed_attn
-from ppo_optimization_hv import run_ppo_optimization_hv
-from ppo_optimization_hv_informed import run_ppo_optimization_hv_informed
-from ppo_optimization_multi import run_ppo_optimization_multi
-from random_search import run_random_search
-from genetic_algorithm import run_genetic_algorithm
-from warm_start_ga import run_warm_start_ga
-from design_repair import run_design_repair
-from intelligent_mutation import run_intelligent_mutation_ga
-from warm_start_intelligent_ga import run_warm_start_intelligent_ga
-from transfer_learning_informed_state import run_transfer_learning_informed_state
-from transfer_learning_design_repair import run_transfer_learning_design_repair
-from adaptive_operator_selection_ga import run_aos_ga
+from optimization.ppo_optimization_random import run_ppo_optimization_random
+from optimization.ppo_optimization_informed_state import run_ppo_optimization_informed_state
+from optimization.ppo_optimization_informed_attn import run_ppo_optimization_informed_attn
+from optimization.ppo_optimization_hv import run_ppo_optimization_hv
+from optimization.ppo_optimization_hv_informed import run_ppo_optimization_hv_informed
+from optimization.ppo_optimization_multi import run_ppo_optimization_multi
+from optimization.random_search import run_random_search
+from optimization.genetic_algorithm import run_genetic_algorithm
+from optimization.warm_start_ga import run_warm_start_ga
+from optimization.design_repair import run_design_repair
+from optimization.intelligent_mutation import run_intelligent_mutation_ga
+from optimization.warm_start_intelligent_ga import run_warm_start_intelligent_ga
+from optimization.transfer_learning_informed_state import run_transfer_learning_informed_state
+from optimization.transfer_learning_design_repair import run_transfer_learning_design_repair
+from optimization.adaptive_operator_selection_ga import run_aos_ga
+from optimization.adaptive_operator_selection_ga_small import run_aos_ga_small
 from utils.evaluation import Chiplet_Configuration_Design
 from utils.component_classes import Component, StructPanel
 from utils.component_list import getComponents
@@ -53,9 +56,10 @@ def initialize_methods():
         OptimizationMethod("Intelligent Mutation GA", run_intelligent_mutation_ga, "cyan", True),
         OptimizationMethod("Warm Start Intelligent Mutation GA", run_warm_start_intelligent_ga, "magenta", True),
         OptimizationMethod("AOS GA Policy", run_aos_ga, "darkgreen", True),
-        OptimizationMethod("AOS GA Classical", run_aos_ga, "dodgerblue", True),
-        # OptimizationMethod("Transfer Learning Informed State", run_transfer_learning_informed_state, "darkorange", True),
-        # OptimizationMethod("Transfer Learning Design Repair", run_transfer_learning_design_repair, "darkred", True),
+        # OptimizationMethod("AOS GA Classical", run_aos_ga, "dodgerblue", True),
+        OptimizationMethod("AOS GA Small", run_aos_ga_small, "darkgreen", True),
+        OptimizationMethod("Transfer Learning Informed State", run_transfer_learning_informed_state, "darkorange", True),
+        OptimizationMethod("Transfer Learning Design Repair", run_transfer_learning_design_repair, "darkred", True),
     ]
     return methods
 
@@ -354,13 +358,40 @@ def force_clear_memory():
     gc.collect()
 
 
+def _model_key(method_name: str) -> str:
+    """Return the model filename stem for a given method."""
+    if method_name == "RL Informed Env":
+        return "actor_model.pth"
+    elif method_name == "Design Repair":
+        return "actor_spacecraft_repair_model.pth"
+    return ""
+
+
+def _copy_best_model(method_name: str, run_idx: int, params: dict):
+    """
+    Copy the freshly-saved model from the current run into a
+    'best_<filename>' file so it survives subsequent runs.
+    """
+    fname = _model_key(method_name)
+    if not fname:
+        return
+    folder = f"results/{params['date_str']}"
+    src = os.path.join(folder, fname)
+    dst = os.path.join(folder, f"best_{fname}")
+    if os.path.exists(src):
+        shutil.copy2(src, dst)
+        print(f"  [BestModel] Copied {fname} -> best_{fname} (run {run_idx})")
+    else:
+        print(f"  [BestModel] WARNING: {fname} not found at {src}")
+
+
 def main():
     # Configuration
     num_runs = 10
 
     params = {
-        'num_epochs': 1500,
-        'mini_batch_size': 16,
+        'num_epochs': 2000,
+        'mini_batch_size': 32,
         'gamma': 0.999,
         'lambda': 0.95,
         'learning_rate': 0.001,
@@ -370,12 +401,12 @@ def main():
         'date_str': datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S"),
         'model_folder': None,
         # Transfer learning params
-        'transfer_pretrain_fraction': 0.3,
-        'transfer_finetune_lr': 0.0005,
+        'transfer_pretrain_fraction': 0.5,
+        'transfer_finetune_lr': 0.001,
         # ---- NEW: Optional path to load pre-trained artifacts ----
         # Set to None to run everything from scratch.
         # Set to a results folder string to load max_values and actor models from it.
-        'pretrained_artifacts_path': 'results/2026-05-04_13-51-50',
+        'pretrained_artifacts_path': "results/2026-06-02_09-48-56", # "results/2026-06-01_16-55-05", # 'results/2026-05-04_13-51-50',
     }
 
     component_list, transfer_learning_components = getComponents()
@@ -396,54 +427,83 @@ def main():
     else:
         max_values = None  # Will be set by Random Search run as before
 
-    for run in range(num_runs):
+    for method in methods:
         print(f"\n{'='*60}")
-        print(f"--- Starting Run {run + 1}/{num_runs} ---")
+        print(f"Running method: {method.name} for {num_runs} run(s)")
         print(f"{'='*60}")
 
-        for method in methods:
-            print(f"\n\n{'='*40}")
-            print(f"Running {method.name} (Run {run + 1})...")
-            print(f"{'='*40}")
+        best_hv = -np.inf          # track best final HV across runs (for RL/repair models)
+        all_run_max_values = []    # collect max_values from each random search run
 
-            # --- Before each method: ensure memory is clean ---
-            force_clear_memory()
+        for run_idx in range(num_runs):
+            print(f"\n--- {method.name} | Run {run_idx + 1}/{num_runs} ---")
 
-            # Load max_values from disk if needed (persists across memory clears)
-            if method.requires_max_values and max_values is None:
-                max_values = load_max_values(params)
-                if max_values is None:
-                    raise ValueError(
-                        f"Method {method.name} requires max_values but none found. "
-                        "Ensure Random Search runs first."
-                    )
+            # --- Run the method ---
+            if method.name == "Random Search":
+                result = method.function(params, eval_function)
+                (all_des, all_obj, pareto_front_des,
+                 pareto_front_obj, hypervolumes, NFE, run_max_values) = result
+                all_run_max_values.append(run_max_values)
 
-            # 1. Run the method
-            results, method_max_values = run_single_method(
-                method, params, eval_function, max_values
-            )
+                # Save run results
+                filename = save_single_run(
+                    method.name, run_idx,
+                    (all_des, all_obj, pareto_front_des, 
+                     pareto_front_obj, hypervolumes, NFE), params
+                )
+                force_clear_memory()
 
-            # 2. Handle max_values from Random Search
-            if method.name == "Random Search" and method_max_values is not None:
-                max_values = method_max_values
-                save_max_values(max_values, params)
+            elif method.requires_max_values and max_values is not None:
+                # Pass best_hv so the method knows what to beat for model saving
+                result = method.function(
+                    max_values, params, eval_function,
+                    run_idx=run_idx, best_hv_so_far=best_hv
+                )
 
-            # 3. Save results to disk immediately
-            fname = save_single_run(method.name, run, results, params)
-            run_files[method.name].append(fname)
-            print(f"Results saved to {fname}")
+                if result is None:
+                    print(f"Warning: {method.name} run {run_idx} returned None")
+                    continue
 
-            # 4. MEMORY MANAGEMENT: delete results and force full GC
-            del results
-            if method_max_values is not None and method.name != "Random Search":
-                del method_max_values
-            force_clear_memory()
+                # Methods that track best model return best_hv alongside results
+                if method.name in ("RL Informed Env", "Design Repair"):
+                    (all_des, all_obj, pareto_front_des,
+                     pareto_front_obj, hypervolumes, NFE, run_best_hv) = result
 
-            print(f"Memory cleared after {method.name}")
+                    # Update global best HV for model selection
+                    if run_best_hv > best_hv:
+                        best_hv = run_best_hv
+                        print(f"  New best HV for {method.name}: {best_hv:.6f} (run {run_idx})")
+                        # The method already saved the best model internally during this run;
+                        # here we copy it to a "best_across_runs" file
+                        _copy_best_model(method.name, run_idx, params)
+                else:
+                    (all_des, all_obj, pareto_front_des,
+                     pareto_front_obj, hypervolumes, NFE) = result
 
-        # --- After each run: clear max_values from memory (it's on disk) ---
-        max_values = None
-        force_clear_memory()
+                filename = save_single_run(
+                    method.name, run_idx,
+                    (all_des, all_obj, pareto_front_des,
+                     pareto_front_obj, hypervolumes, NFE), params
+                )
+                force_clear_memory()
+
+            else:
+                if method.requires_max_values and max_values is None:
+                    print(f"Skipping {method.name}: max_values not yet available.")
+                    continue
+
+        # ── Post-all-runs processing ──────────────────────────────────────────
+
+        if method.name == "Random Search":
+            # Combine max values across all runs (element-wise max)
+            combined_max = np.max(np.stack(all_run_max_values, axis=0), axis=0)
+            max_values = combined_max
+            save_max_values(max_values, params)
+            print(f"\nCombined max_values across {num_runs} run(s): {max_values}")
+
+        if method.name in ("RL Informed Env", "Design Repair") and best_hv > -np.inf:
+            print(f"\nBest HV for {method.name} across all runs: {best_hv:.6f}")
+            print(f"Best model saved to: results/{params['date_str']}/best_{_model_key(method.name)}")
 
     # ================================================================
     # POST-PROCESSING: Reload only what's needed for plots/stats

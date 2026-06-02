@@ -7,10 +7,10 @@ import time
 import matplotlib.pyplot as plt
 
 from utils.hypervolume_utils import HypervolumeGrid
-from transformer_architecture_hv_informed import Actor, Critic
+from optimization.transformer_architecture_random import Actor, Critic
 
 
-def run_ppo_optimization_hv_informed(max_objectives, params, eval_function):
+def run_ppo_optimization_random(max_objectives, params, eval_function):
 
     """
     Run the PPO optimization for the given number of components and objectives.
@@ -41,16 +41,13 @@ def run_ppo_optimization_hv_informed(max_objectives, params, eval_function):
     all_avg_obj = []
     all_kl = []
     hv_grid = HypervolumeGrid(refPoint=[1.0]*num_objectives)
-    pareto_front_des = []
-    pareto_front_obj = []
-    hypervolumes = []
 
     for epoch in range(epochs):
         if epoch % 10 == 9:
             print(f"Epoch {epoch + 1}/{epochs}")
-        actor, critic, NFE, all_des, all_obj, all_constraints, avg_obj, critic_loss, actor_loss, kl, hv_grid, pareto_front_des, pareto_front_obj, hypervolumes = run_epoch(
+        actor, critic, NFE, all_des, all_obj, all_constraints, avg_obj, critic_loss, actor_loss, kl = run_epoch(
             actor, critic, num_actions, NFE, max_objectives,
-            all_des, all_obj, all_constraints, device, params, eval_function, hv_grid, pareto_front_des, pareto_front_obj, hypervolumes
+            all_des, all_obj, all_constraints, device, params, eval_function
         )
         all_actor_loss.append(actor_loss)
         all_critic_loss.append(critic_loss)
@@ -62,6 +59,37 @@ def run_ppo_optimization_hv_informed(max_objectives, params, eval_function):
     all_constraints = np.array(all_constraints)
     all_obj[all_constraints] = max_objectives
     print(f"Number of valid designs (False in all_constraints): {np.sum(all_constraints == False)}")
+
+    norm_obj = all_obj / max_objectives
+
+    ref_point = np.ones(num_objectives)
+
+    pareto_front_des = []
+    pareto_front_obj = []
+    hypervolumes = []
+
+    for obj in range(NFE):
+        if all_constraints[obj]:
+            hypervolumes.append(hypervolumes[-1] if hypervolumes else 0)
+            pareto_front_obj.append(pareto_front_obj[-1] if pareto_front_obj else [])
+            pareto_front_des.append(pareto_front_des[-1] if pareto_front_des else [])
+        else:
+            try:
+                hv_grid.updateHV(norm_obj[obj], all_des[obj])
+                hypervolumes.append(hv_grid.getHV())
+                pareto_front_obj.append(hv_grid.paretoFrontPoint)
+                pareto_front_des.append(hv_grid.paretoFrontSolution)
+            except Exception as e:
+                print(f"Error updating hypervolume grid: {e}")
+                print(f"Design: {all_des[obj]}")
+                print(f"Objectve: {norm_obj[obj]}")
+                hypervolumes.append(hypervolumes[-1] if hypervolumes else 0)
+                pareto_front_obj.append(pareto_front_obj[-1] if pareto_front_obj else [])
+                pareto_front_des.append(pareto_front_des[-1] if pareto_front_des else [])
+        # if (len(hypervolumes) > 1 and hypervolumes[-2] < hypervolumes[-1]) or len(hypervolumes) == 1:
+        #     print(f"New max HV found: {hv_grid.getHV()} at NFE {obj+1}")
+        #     print(f"Pareto front objectives:\n{hv_grid.paretoFrontPoint}" + \
+        #           f"\nCorresponding designs:\n{hv_grid.paretoFrontSolution}")
 
     torch.save(actor.state_dict(), f'results/{date_str}/actor_model.pth')
     torch.save(critic.state_dict(), f'results/{date_str}/critic_model.pth')
@@ -99,13 +127,9 @@ def run_ppo_optimization_hv_informed(max_objectives, params, eval_function):
 
 
 def get_models(num_actions, device, params, unique_des_space, num_objectives, comp_list):
-    # Add num_objectives parameter to Actor constructor
-    actor = Actor(device=device, params=params, des_space=unique_des_space, comp_list=comp_list, num_objectives=num_objectives)
-    # Update critic input dimension to account for Pareto front objectives
-    # We'll use a maximum estimated size for Pareto front (e.g., 100 points)
-    max_pareto_size = 100
-    pareto_state_size = max_pareto_size * num_objectives
-    critic = Critic(device=device, params=params, num_objectives=num_objectives, input_dim=pareto_state_size + num_actions)
+
+    actor = Actor(device=device, params=params, des_space=unique_des_space, comp_list=comp_list)
+    critic = Critic(device=device, params=params, num_objectives=num_objectives, input_dim=num_actions)
 
     actor.to(device)
     critic.to(device)
@@ -115,8 +139,8 @@ def get_models(num_actions, device, params, unique_des_space, num_objectives, co
         critic.load_state_dict(torch.load(f"{params['model_folder']}/critic_model.pth"))
         print("Loaded pre-trained models.")
 
-    # Update input tensor to include Pareto front state
-    input = torch.zeros((1, pareto_state_size + num_actions), dtype=torch.float32).to(device)
+    input = torch.zeros((1, num_actions), dtype=torch.float32).to(device)
+    # input_critic = torch.zeros((1, num_actions, 1), dtype=torch.float32).to(device)
 
     actor(input, 0)
     critic(input)
@@ -129,51 +153,24 @@ def discounted_cumulative_sums(x, discount):
     return scipy.signal.lfilter([1], [1, float(-discount)], x[::-1], axis=0)[::-1]
 
 
-def run_epoch(actor, critic, num_actions, NFE, max_obj, all_des, all_obj, all_constraints, device, params, eval_function, hv_grid, pareto_front_des, pareto_front_obj, hypervolumes):
+def run_epoch(actor, critic, num_actions, NFE, max_obj, all_des, all_obj, all_constraints, device, params, eval_function):
 
     mini_batch_size = params['mini_batch_size']
     num_objs = len(max_obj)
     des_space = eval_function.design_space
-    max_pareto_size = 100  # Same as defined in get_models
 
     rewards = [[] for x in range(mini_batch_size)]
     actions = [[] for x in range(mini_batch_size)]
     logprobs = [[] for x in range(mini_batch_size)]
     designs = [[] for x in range(mini_batch_size)]
 
-    # Get current Pareto front state
-    def get_pareto_state():
-        if not pareto_front_obj or len(pareto_front_obj) == 0 or len(pareto_front_obj[-1]) == 0:
-            # No Pareto front yet, return zeros
-            return [0.0] * (max_pareto_size * num_objs)
-        
-        current_pareto = pareto_front_obj[-1]
-        pareto_state = []
-        
-        # Normalize and flatten Pareto front objectives
-        for point in current_pareto:
-            if len(point) == num_objs:
-                normalized_point = [obj / max_obj[i] for i, obj in enumerate(point)]
-                pareto_state.extend(normalized_point)
-        
-        # Pad with zeros if needed
-        while len(pareto_state) < max_pareto_size * num_objs:
-            pareto_state.append(0.0)
-        
-        # Truncate if too long
-        pareto_state = pareto_state[:max_pareto_size * num_objs]
-        
-        return pareto_state
+    observation = [[] for x in range(mini_batch_size)]
 
-    # Initialize observations with Pareto front state
-    pareto_state = get_pareto_state()
-    observation = []
-    for idx in range(mini_batch_size):
-        # Prepend Pareto front state to the beginning of each observation
-        obs_with_pareto = pareto_state.copy()
-        observation.append(obs_with_pareto)
+    # doing the random weight method for now. In the future want to experiment with other methods
+    weights_nonnorm = np.random.rand(mini_batch_size, num_objs)
+    weights = weights_nonnorm / weights_nonnorm.sum(axis=1, keepdims=True)
 
-    # sample actor (rest of the sampling logic remains the same)
+    # sample actor
     for i in range(num_actions):
         log_probs, sel_actions = actor.sample_action(observation, i)
         log_probs = log_probs.tolist()
@@ -195,8 +192,6 @@ def run_epoch(actor, critic, num_actions, NFE, max_obj, all_des, all_obj, all_co
 
     # get objective values
     objectives = []
-    current_batch_hv_rewards = []
-
     for idx, des in enumerate(designs):
         obj_values, constraints = eval_function.evaluate(des)
         NFE += 1
@@ -204,80 +199,24 @@ def run_epoch(actor, critic, num_actions, NFE, max_obj, all_des, all_obj, all_co
         all_obj.append(obj_values)
         all_constraints.append(constraints)
         objectives.append(obj_values)
-        
-        # Calculate hypervolume reward
-        if constraints:  # If design violates constraints
-            hv_reward = -1.0  # Penalty for constraint violation
-            # Keep previous hypervolume values
-            if hypervolumes:
-                hypervolumes.append(hypervolumes[-1])
-                pareto_front_obj.append(pareto_front_obj[-1].copy() if pareto_front_obj else [])
-                pareto_front_des.append(pareto_front_des[-1].copy() if pareto_front_des else [])
-            else:
-                hypervolumes.append(0.0)
-                pareto_front_obj.append([])
-                pareto_front_des.append([])
+        if constraints:
+            rewards[idx][-1] = rewards[idx][-1] + np.dot(weights[idx], -np.ones_like(np.array(max_obj)))
         else:
-            # Normalize objectives (assuming minimization, convert to maximization for HV)
-            norm_obj = []
-            for i, obj_val in enumerate(obj_values):
-                # Convert to maximization problem by negating and normalizing
-                norm_val = max(0.0, (max_obj[i] - obj_val) / max_obj[i])
-                norm_obj.append(norm_val)
-            
-            try:
-                # Store previous hypervolume
-                prev_hv = hv_grid.getHV() if hypervolumes else 0.0
-                
-                # Update hypervolume grid with new point
-                hv_grid.updateHV(norm_obj, des)
-                new_hv = hv_grid.getHV()
-                
-                # Calculate hypervolume improvement as reward
-                hv_reward = new_hv - prev_hv
-                
-                # Store hypervolume and Pareto front info
-                hypervolumes.append(new_hv)
-                pareto_front_obj.append(hv_grid.paretoFrontPoint.copy() if hasattr(hv_grid, 'paretoFrontPoint') else [])
-                pareto_front_des.append(hv_grid.paretoFrontSolution.copy() if hasattr(hv_grid, 'paretoFrontSolution') else [])
-                
-            except Exception as e:
-                print(f"Error updating hypervolume grid: {e}")
-                print(f"Design: {des}")
-                print(f"Objective: {norm_obj}")
-                hv_reward = 0.0  # No reward for failed evaluation
-                # Keep previous values
-                if hypervolumes:
-                    hypervolumes.append(hypervolumes[-1])
-                    pareto_front_obj.append(pareto_front_obj[-1].copy() if pareto_front_obj else [])
-                    pareto_front_des.append(pareto_front_des[-1].copy() if pareto_front_des else [])
-                else:
-                    hypervolumes.append(0.0)
-                    pareto_front_obj.append([])
-                    pareto_front_des.append([])
-        
-        current_batch_hv_rewards.append(hv_reward)
-
-    # Update rewards with hypervolume changes
-    for idx in range(mini_batch_size):
-        # Replace the last reward (which was set to 0) with the hypervolume reward
-        rewards[idx][-1] = current_batch_hv_rewards[idx]
+            # print(f"Found a valid design! Genetic Algorithm: Design: {des}, Objectives: {objectives}")
+            rewards[idx][-1] = rewards[idx][-1] + np.dot(weights[idx], -np.array(obj_values)/np.array(max_obj))
 
     # sample critic
     critic_values = []
-    pareto_state_size = max_pareto_size * num_objs
     for action_idx in range(num_actions):
         critic_observations = []
         for idx in range(mini_batch_size):
             obs = observation[idx]
             critic_obs = []
-            # Include Pareto front state + actions up to current index
-            critic_obs.extend(obs[:pareto_state_size + action_idx + 1])
+            critic_obs.extend(obs[:action_idx + 1])
             critic_observations.append(critic_obs)
-        crit_val = critic.sample_critic(critic_observations)
-        if isinstance(crit_val, torch.Tensor):
-            crit_val = crit_val.squeeze(-1).tolist()
-        critic_values.append(crit_val)
+        crit_vals = critic.sample_critic(critic_observations)
+        crit_vals = np.array(crit_vals.tolist())
+        critic_values.append(np.sum(np.multiply(weights, crit_vals), axis=1))
 
     values = [[] for x in range(mini_batch_size)]
     for act_idx, act_vals in enumerate(critic_values):
@@ -314,29 +253,26 @@ def run_epoch(actor, critic, num_actions, NFE, max_obj, all_des, all_obj, all_co
     logprob_tensor = []
     advantage_tensor = []
     return_tensor = []
+    weights_tensor = []
     for batch_element_idx in range(mini_batch_size):
         obs = observation[batch_element_idx]
-        # obs now contains [pareto_front_state..., action1, action2, ...]
-        pareto_part = obs[:pareto_state_size]  # Extract Pareto front state
-        actions_part = obs[pareto_state_size:]  # Extract actions
-        
-        for idx in range(len(actions_part)):
-            # Create observation fragment: Pareto front state + actions up to current index
-            obs_fragment = pareto_part + actions_part[:idx+1]
-            # Pad with zeros if needed (pareto_state + actions + padding)
-            while len(obs_fragment) < pareto_state_size + num_actions:
+        for idx in range(len(obs)):
+            obs_fragment = obs[:idx+1]
+            while len(obs_fragment) < num_actions:
                 obs_fragment.append(0)
             observation_tensor.append(obs_fragment)
             action_tensor.append(actions[batch_element_idx][idx])
             logprob_tensor.append(logprobs[batch_element_idx][idx])
             advantage_tensor.append(all_advantages[batch_element_idx][idx])
             return_tensor.append(all_returns[batch_element_idx][idx])
+            weights_tensor.append(weights[batch_element_idx])
 
     observation_tensor = torch.tensor(observation_tensor, dtype=torch.float32).to(device)
     action_tensor = torch.tensor(action_tensor, dtype=torch.float32).to(device)
     logprob_tensor = torch.tensor(logprob_tensor, dtype=torch.float32).to(device)
     advantage_tensor = torch.tensor(advantage_tensor, dtype=torch.float32).to(device)
     return_tensor = torch.tensor(return_tensor, dtype=torch.float32).to(device)
+    weights_tensor = torch.tensor(np.array(weights_tensor), dtype=torch.float32).to(device)
 
     targetkl = params['target_kl']
     actor_iterations = params['update_iterations']
@@ -355,11 +291,12 @@ def run_epoch(actor, critic, num_actions, NFE, max_obj, all_des, all_obj, all_co
     for i in range(critic_iterations):
         critic_loss = critic.ppo_update(
             observation_tensor, 
-            return_tensor
+            return_tensor, 
+            weights_tensor
         )
 
     avg_obj = np.mean(objectives, axis=0)
     # print(f"Actor Loss: {actor_loss:.4f}, \nCritic Loss: {critic_loss:.4f}, \nKL: {kl:.4f}, \nAvg Objectives: {avg_obj}\n")
     # print(f"Avg Objectives: {avg_obj}")
 
-    return actor, critic, NFE, all_des, all_obj, all_constraints, avg_obj, critic_loss, actor_loss, kl, hv_grid, pareto_front_des, pareto_front_obj, hypervolumes
+    return actor, critic, NFE, all_des, all_obj, all_constraints, avg_obj, critic_loss, actor_loss, kl

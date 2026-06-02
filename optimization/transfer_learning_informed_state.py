@@ -9,10 +9,10 @@ import matplotlib.pyplot as plt
 from utils.hypervolume_utils import HypervolumeGrid
 from utils.evaluation import Chiplet_Configuration_Design
 from utils.component_classes import StructPanel
-from transformer_architecture_informed_state import Actor, Critic
+from optimization.transformer_architecture_informed_state import Actor, Critic
 
 # Reuse these directly from the original informed_state module
-from ppo_optimization_informed_state import run_epoch, get_models
+from optimization.ppo_optimization_informed_state import run_epoch, get_models
 
 
 def _estimate_max_objectives(eval_function, num_samples=500):
@@ -41,7 +41,7 @@ def _estimate_max_objectives(eval_function, num_samples=500):
                 else:
                     design.append(rng.choice(np.array(var['range'])))
         try:
-            objectives, constrained = eval_function.evaluate(design)
+            objectives, constrained, constraint_vals = eval_function.evaluate(design)
             if not constrained:
                 obj_arr = np.array(objectives)
                 valid_des = True
@@ -76,8 +76,8 @@ def run_transfer_learning_informed_state(max_objectives, params, eval_function):
         device = torch.device("cpu")
     print(f"Using device: {device}")
 
-    from utils.component_list import getComponents
-    _, transfer_component_sets = getComponents()
+    from utils.component_list import create_varied_components
+    transfer_component_sets = create_varied_components(num_sets=10)
 
     if transfer_component_sets is None or len(transfer_component_sets) == 0:
         raise ValueError(
@@ -92,10 +92,12 @@ def run_transfer_learning_informed_state(max_objectives, params, eval_function):
     date_str = params['date_str']
 
     # Budget split: 30% pre-train, 70% fine-tune
-    pretrain_fraction = params.get('transfer_pretrain_fraction', 0.3)
-    pretrain_epochs_total = int(epochs * pretrain_fraction)
-    pretrain_epochs_per_set = max(1, pretrain_epochs_total // len(transfer_component_sets))
-    finetune_epochs = epochs - pretrain_epochs_total
+    # pretrain_fraction = params.get('transfer_pretrain_fraction', 0.5)
+    # pretrain_epochs_total = int(epochs * pretrain_fraction)
+    # pretrain_epochs_per_set = max(1, pretrain_epochs_total // len(transfer_component_sets))
+    # finetune_epochs = epochs - pretrain_epochs_total
+    pretrain_epochs_per_set = 5000 # 5000
+    pretrain_epochs_total = pretrain_epochs_per_set * len(transfer_component_sets)
 
     # ============================================================
     # Phase 1: Pre-training on transfer component sets
@@ -109,7 +111,7 @@ def run_transfer_learning_informed_state(max_objectives, params, eval_function):
     params['model_folder'] = None
     actor, critic = get_models(
         num_actions, device, params, unique_des_space,
-        num_objectives, eval_function.component_list
+        num_objectives+1, eval_function.component_list
     )
     params['model_folder'] = original_model_folder
 
@@ -124,18 +126,18 @@ def run_transfer_learning_informed_state(max_objectives, params, eval_function):
 
         # Temporary accumulators (discarded after each transfer set)
         pt_NFE = 0
-        pt_des, pt_obj, pt_con = [], [], []
+        pt_des, pt_obj, pt_con, pt_con_val = [], [], [], []
 
         for epoch in range(pretrain_epochs_per_set):
             if epoch % 50 == 49:
                 print(f"  Pre-train epoch {epoch + 1}/{pretrain_epochs_per_set}")
-            actor, critic, pt_NFE, pt_des, pt_obj, pt_con, _, _, _, _ = run_epoch(
+            actor, critic, pt_NFE, pt_des, pt_obj, pt_con, pt_con_val, _, _, _, _ = run_epoch(
                 actor, critic, num_actions, pt_NFE, transfer_max_obj,
-                pt_des, pt_obj, pt_con, device, params, transfer_eval
+                pt_des, pt_obj, pt_con, pt_con_val, device, params, transfer_eval
             )
 
         # Free transfer set memory
-        del transfer_eval, pt_des, pt_obj, pt_con
+        del transfer_eval, pt_des, pt_obj, pt_con, pt_con_val
         gc.collect()
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
@@ -150,6 +152,7 @@ def run_transfer_learning_informed_state(max_objectives, params, eval_function):
     # ============================================================
     # Phase 2: Fine-tuning on actual problem
     # ============================================================
+    finetune_epochs = params['num_epochs']
     print(f"\nPHASE 2: Fine-tuning for {finetune_epochs} epochs on actual problem")
 
     # Reset optimizers with lower LR for fine-tuning
@@ -161,16 +164,16 @@ def run_transfer_learning_informed_state(max_objectives, params, eval_function):
 
     # Standard training loop — identical to ppo_optimization_informed_state [6]
     NFE = 0
-    all_des, all_obj, all_constraints = [], [], []
+    all_des, all_obj, all_constraints, all_constraint_vals = [], [], [], []
     all_actor_loss, all_critic_loss, all_avg_obj, all_kl = [], [], [], []
     hv_grid = HypervolumeGrid(refPoint=[1.0] * num_objectives)
 
     for epoch in range(finetune_epochs):
         if epoch % 10 == 9:
             print(f"Fine-tune epoch {epoch + 1}/{finetune_epochs}")
-        actor, critic, NFE, all_des, all_obj, all_constraints, avg_obj, critic_loss, actor_loss, kl = run_epoch(
+        actor, critic, NFE, all_des, all_obj, all_constraints, all_constraint_vals, avg_obj, critic_loss, actor_loss, kl = run_epoch(
             actor, critic, num_actions, NFE, max_objectives,
-            all_des, all_obj, all_constraints, device, params, eval_function
+            all_des, all_obj, all_constraints, all_constraint_vals, device, params, eval_function
         )
         all_actor_loss.append(actor_loss)
         all_critic_loss.append(critic_loss)
@@ -183,6 +186,7 @@ def run_transfer_learning_informed_state(max_objectives, params, eval_function):
     all_des = np.array(all_des)
     all_obj = np.array(all_obj)
     all_constraints = np.array(all_constraints)
+    all_constraint_vals = np.array(all_constraint_vals)
     all_obj[all_constraints] = max_objectives
     print(f"Valid designs: {np.sum(~all_constraints)}")
 

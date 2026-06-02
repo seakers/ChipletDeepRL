@@ -3,8 +3,8 @@ import pygad
 import torch
 
 from utils.hypervolume_utils import HypervolumeGrid
-from transformer_architecture_informed_state import Actor as Actor_start
-from transformer_design_repair import Actor as Actor_mutate
+from optimization.transformer_architecture_informed_state import Actor as Actor_start
+from optimization.transformer_design_repair import Actor as Actor_mutate
 
 
 def get_models_warm_start(num_actions, device, params, unique_des_space, num_objectives, comp_list):
@@ -24,10 +24,10 @@ def get_models_warm_start(num_actions, device, params, unique_des_space, num_obj
 
 def sample_designs(num_actions, params, unique_des_space, des_space, num_objectives, comp_list):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    actor_start = get_models_warm_start(num_actions, device, params, unique_des_space, num_objectives, comp_list)
+    actor_start = get_models_warm_start(num_actions, device, params, unique_des_space, num_objectives+1, comp_list)
 
     mini_batch_size = params['mini_batch_size']
-    weights_nonnorm = np.random.rand(mini_batch_size, num_objectives)
+    weights_nonnorm = np.append(np.random.rand(mini_batch_size, num_objectives), np.ones((mini_batch_size, 1)), axis=1)
     weights = weights_nonnorm / weights_nonnorm.sum(axis=1, keepdims=True)
 
     designs = [[] for x in range(mini_batch_size)]
@@ -95,6 +95,7 @@ def run_warm_start_intelligent_ga(max_obj, params, eval_function):
     all_des = []
     all_obj = []
     all_constraints = []
+    all_constraint_vals = []
     NFE = 0
     hv_grid = HypervolumeGrid(refPoint=[1.0]*num_objectives)
 
@@ -118,18 +119,19 @@ def run_warm_start_intelligent_ga(max_obj, params, eval_function):
     def fitness_func(ga_instance, solution, solution_idx):
         # print(f"Evaluating solution {solution}")
         solution = repair_invalid_panels(solution)
-        objectives, constraints = eval_function.evaluate(solution)
+        objectives, constraints, constraint_vals = eval_function.evaluate(solution)
         # print(f"Objectives: {objectives}")
-        nonlocal all_des, all_obj, all_constraints, NFE
+        nonlocal all_des, all_obj, all_constraints, NFE, all_constraint_vals
         all_des.append(solution)
         all_obj.append(objectives)
         all_constraints.append(constraints)
+        all_constraint_vals.append(constraint_vals)
         NFE += 1
         if constraints:
-            return -max_obj
+            return -np.array(np.append(max_obj,constraint_vals), dtype=float)
         else:
             # print(f"Found a valid design! Genetic Algorithm: Design: {solution}, Objectives: {objectives}")
-            return -np.array(objectives)
+            return -np.array(objectives + [constraint_vals], dtype=float)
 
     def on_generation(ga_instance):
         if ga_instance.generations_completed % 10 == 0:
@@ -184,6 +186,7 @@ def run_warm_start_intelligent_ga(max_obj, params, eval_function):
     all_des = np.array(all_des)
     all_obj = np.array(all_obj)
     all_constraints = np.array(all_constraints, dtype=bool)
+    all_constraint_vals = np.array(all_constraint_vals)
     all_obj[all_constraints] = max_obj
     print(f"Number of valid designs (False in all_constraints): {np.sum(all_constraints == False)}")
     

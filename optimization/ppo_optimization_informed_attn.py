@@ -7,10 +7,10 @@ import time
 import matplotlib.pyplot as plt
 
 from utils.hypervolume_utils import HypervolumeGrid
-from transformer_architecture_random import Actor, Critic
+from optimization.transformer_architecture_informed_attn import Actor, Critic
 
 
-def run_ppo_optimization_random(max_objectives, params, eval_function):
+def run_ppo_optimization_informed_attn(max_objectives, params, eval_function):
 
     """
     Run the PPO optimization for the given number of components and objectives.
@@ -142,7 +142,11 @@ def get_models(num_actions, device, params, unique_des_space, num_objectives, co
     input = torch.zeros((1, num_actions), dtype=torch.float32).to(device)
     # input_critic = torch.zeros((1, num_actions, 1), dtype=torch.float32).to(device)
 
-    actor(input, 0)
+    weights_nonnorm = np.random.rand(1, num_objectives)
+    weights = weights_nonnorm / weights_nonnorm.sum(axis=1, keepdims=True)
+    weights_tensor = torch.tensor(weights, dtype=torch.float32).to(device)
+
+    actor(input, 0, weights_tensor)
     critic(input)
 
     return actor, critic
@@ -169,10 +173,11 @@ def run_epoch(actor, critic, num_actions, NFE, max_obj, all_des, all_obj, all_co
     # doing the random weight method for now. In the future want to experiment with other methods
     weights_nonnorm = np.random.rand(mini_batch_size, num_objs)
     weights = weights_nonnorm / weights_nonnorm.sum(axis=1, keepdims=True)
+    weights_tensor_inference = torch.tensor(weights, dtype=torch.float32).to(device)
 
     # sample actor
     for i in range(num_actions):
-        log_probs, sel_actions = actor.sample_action(observation, i)
+        log_probs, sel_actions = actor.sample_action(observation, i, weights_tensor_inference)
         log_probs = log_probs.tolist()
         sel_actions = sel_actions.tolist()
 
@@ -281,7 +286,8 @@ def run_epoch(actor, critic, num_actions, NFE, max_obj, all_des, all_obj, all_co
             observation_tensor, 
             action_tensor, 
             logprob_tensor,
-            advantage_tensor
+            advantage_tensor,
+            weights_tensor_inference
         )
         if kl > targetkl:
             print("KL Divergence exceeded target, stopping actor update")

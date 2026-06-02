@@ -4,9 +4,9 @@ import numpy as np
 import torch
 
 from utils.hypervolume_utils import HypervolumeGrid
-from transformer_design_repair import Actor as RepairActor
-from transformer_architecture_informed_state import Actor as WarmStartActor
-from intelligent_mutation import encode_design, decode_action_to_value
+from optimization.transformer_design_repair import Actor as RepairActor
+from optimization.transformer_architecture_informed_state import Actor as WarmStartActor
+from optimization.intelligent_mutation import encode_design, decode_action_to_value
 
 class AdaptiveOperatorSelector:
     """
@@ -326,6 +326,7 @@ def run_aos_ga(max_obj, params, eval_function):
     all_des = []
     all_obj = []
     all_constraints = []
+    all_constraint_vals = []
     NFE = 0
     hv_grid = HypervolumeGrid(refPoint=[1.0] * num_objectives)
 
@@ -337,6 +338,7 @@ def run_aos_ga(max_obj, params, eval_function):
     population = []
     pop_objectives = []
     pop_constraints = []
+    pop_constraint_vals = []
 
     for _ in range(pop_size):
         design = []
@@ -358,16 +360,18 @@ def run_aos_ga(max_obj, params, eval_function):
 
         design = np.array(design, dtype=float)
         design = repair_invalid_panels(design, eval_function, des_space)
-        objectives, constraints = eval_function.evaluate(design.tolist())
+        objectives, constraints, constraint_vals = eval_function.evaluate(design.tolist())
         NFE += 1
 
         population.append(design)
         pop_objectives.append(objectives if not constraints else max_obj)
         pop_constraints.append(constraints)
+        pop_constraint_vals.append(constraint_vals)
 
         all_des.append(design.tolist())
         all_obj.append(objectives)
         all_constraints.append(constraints)
+        all_constraint_vals.append(constraint_vals)
 
     # Get initial HV
     prev_hv = 0.0
@@ -386,6 +390,7 @@ def run_aos_ga(max_obj, params, eval_function):
         offspring_population = []
         offspring_objectives = []
         offspring_constraints = []
+        offspring_constraint_vals = []
         offspring_cx_ops = []   # Track which crossover operator was used
         offspring_mut_ops = []  # Track which mutation operator was used
 
@@ -420,19 +425,20 @@ def run_aos_ga(max_obj, params, eval_function):
                 child = clip_to_bounds(child, des_space)
                 child = repair_invalid_panels(child, eval_function, des_space)
 
-                objectives, constraints = eval_function.evaluate(child.tolist())
+                objectives, constraints, constraint_vals = eval_function.evaluate(child.tolist())
                 NFE += 1
 
                 offspring_population.append(child)
                 offspring_objectives.append(objectives if not constraints else max_obj)
                 offspring_constraints.append(constraints)
+                offspring_constraint_vals.append(constraint_vals)
                 offspring_cx_ops.append(cx_idx)
                 offspring_mut_ops.append(mut_idx_used)
 
                 all_des.append(child.tolist())
                 all_obj.append(objectives)
                 all_constraints.append(constraints)
-
+                all_constraint_vals.append(constraint_vals)
                 i += 1
 
         # ---- Credit assignment based on HV improvement ----
@@ -455,9 +461,10 @@ def run_aos_ga(max_obj, params, eval_function):
                 crossover_aos.update(offspring_cx_ops[idx], hv_improvement)
                 mutation_aos.update(offspring_mut_ops[idx], hv_improvement)
             else:
-                # Constrained offspring: small negative credit
-                crossover_aos.update(offspring_cx_ops[idx], 0.0)
-                mutation_aos.update(offspring_mut_ops[idx], 0.0)
+                # Constrained offspring: constraint reward based on constraint_vals
+                constraint_reward = offspring_constraint_vals[idx] * 0.01 #scaled down
+                crossover_aos.update(offspring_cx_ops[idx], constraint_reward)
+                mutation_aos.update(offspring_mut_ops[idx], constraint_reward)
 
         prev_hv = current_hv
 
@@ -477,6 +484,7 @@ def run_aos_ga(max_obj, params, eval_function):
     all_des = np.array(all_des)
     all_obj = np.array(all_obj)
     all_constraints = np.array(all_constraints, dtype=bool)
+    all_constraint_vals = np.array(all_constraint_vals)
     all_obj[all_constraints] = max_obj
     print(f"Number of valid designs: {np.sum(~all_constraints)}")
 

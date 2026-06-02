@@ -109,6 +109,7 @@ class Chiplet_Configuration_Design():
         num_comps = len(dimensions)
         num_panels = len(struct_dims)
         comp_pair_list = itertools.combinations(range(num_comps), 2)
+        overlap_ind = [False] * num_comps
         for pair in comp_pair_list:
             (ind1, ind2) = pair
             overlap_bool = self.separating_axis_test(
@@ -116,7 +117,8 @@ class Chiplet_Configuration_Design():
                 dimensions[ind2], locations[ind2], orientations[ind2]
             )
             if overlap_bool:
-                return True
+                # print(f"Overlap detected between components {ind1} and {ind2}")
+                overlap_ind[max(ind1, ind2)] = True # max to penalize the second component placed
         struct_comp_pair_list = itertools.product(range(num_comps), range(num_panels))
         for struct_pair in struct_comp_pair_list:
             comp_ind, struct_ind = struct_pair
@@ -125,8 +127,9 @@ class Chiplet_Configuration_Design():
                 struct_dims[struct_ind], struct_locs[struct_ind], struct_orients[struct_ind]
             )
             if overlap_bool:
-                return True
-        return False
+                # print(f"Overlap detected between component {comp_ind} and structure panel {struct_ind}")
+                overlap_ind[comp_ind] = True
+        return overlap_ind
 
 
     def separating_axis_test(self, dim1, loc1, dcm1, dim2, loc2, dcm2):
@@ -250,16 +253,14 @@ class Chiplet_Configuration_Design():
         
         new_point_locs, new_point_dims, new_point_orients = self.pointing_obj(dimensions, locations, types, orientations, pointing)
 
-        overlap_bool = self.overlap_cost_arbitrary(
+        overlap_inds = self.overlap_cost_arbitrary(
             dimensions + new_point_dims,
             locations + new_point_locs,
             orientations + new_point_orients,
             struct_dims, struct_locs, struct_orients
         )
-        if not overlap_bool:
-            return False
-        # print("CONSTRAINT VIOLATED: OVERLAP")
-        return True
+        
+        return overlap_inds
 
 
     def triangle_prism_shell(self, structure_panels, x_dim, y_dim, z_dim):
@@ -515,10 +516,10 @@ class Chiplet_Configuration_Design():
                 # print(f"PANEL CHOICE INVALID: {panel_choice} for component {comp}")
                 # print(f"VALID PANELS: {[i for i, panel in enumerate(self.structure_panels) if panel is not None]}")
                 # print(f"Full Design Vector: {x}")
-                return [-1]*self.num_objectives, True  # constraint violated if a non-existent panel is chosen
+                return [-1]*self.num_objectives, True, 0.0 # constraint violated if a non-existent panel is chosen
             if self.component_list[comp].pointing and panel_choice > 7: # checks if pointing component is on a shelf
                 print(f"POINTING COMPONENT {comp} CANNOT BE ON A SHELF")
-                return [-1]*self.num_objectives, True
+                return [-1]*self.num_objectives, True, 0.0
 
         self.get_components(x)
         # print(f"Got past panel selection and component placement!")
@@ -554,14 +555,16 @@ class Chiplet_Configuration_Design():
                 struct_orients.append(panel.orientation)
 
         # Get the cost from each cost source
-        constraint_violated = self.constraint_cost(
+        overlap_inds = self.constraint_cost(
             dimensions, locations, types, orientations, masses, pointing,
             struct_dims, struct_locs, struct_orients
         )
-        if constraint_violated:
-            # print(f"Overlap Detected!")
-            return [-1]*self.num_objectives, constraint_violated
-        # print(f"No Overlap!")
+        if any(overlap_inds):
+            constraint_violated = True
+        else:            
+            constraint_violated = False
+
+        overlap_score = sum(overlap_inds)/len(self.component_list)
 
         cm_cost_val = self.center_mass_cost(
             locations, masses, struct_locs, struct_masses
@@ -582,7 +585,7 @@ class Chiplet_Configuration_Design():
         ]
 
         # print(f"Found a valid design! Costs: {cost_list}")
-        return cost_list, constraint_violated
+        return cost_list, constraint_violated, overlap_score
 
 
 # class Speed_Reducer_Design():
