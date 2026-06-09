@@ -70,7 +70,7 @@ echo ""
 MONITOR_PID=$!
 
 # Run the optimization
-srun python -u opt_main.py
+srun python -u main.py
 
 # Clean up monitor
 kill $MONITOR_PID 2>/dev/null || true

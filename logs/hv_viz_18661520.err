@@ -1,5 +1,0 @@
-Restoring modules from user's spa_con_collection
-Traceback (most recent call last):
-  File "/scratch/user/demagall/ChipletDeepRL/hv_vis.py", line 143, in <module>
-    storage_combined[key]['all_runs_hypervolumes'].extend(
-KeyError: 'aos_ga_policy'

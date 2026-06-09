@@ -43,22 +43,22 @@ class OptimizationMethod:
 def initialize_methods():
     """Initialize all optimization methods with their properties"""
     methods = [
-        OptimizationMethod("Random Search", run_random_search, "blue", False),
-        OptimizationMethod("Genetic Algorithm", run_genetic_algorithm, "orange", True),
+        # OptimizationMethod("Random Search", run_random_search, "blue", False),
+        # OptimizationMethod("Genetic Algorithm", run_genetic_algorithm, "orange", True),
         # OptimizationMethod("RL Standard", run_ppo_optimization_random, "pink", True),
-        OptimizationMethod("RL Informed Env", run_ppo_optimization_informed_state, "purple", True),
+        # OptimizationMethod("Design Synthesis PPO", run_ppo_optimization_informed_state, "purple", True),
         # OptimizationMethod("RL Informed Attention", run_ppo_optimization_informed_attn, "brown", True),
         # OptimizationMethod("RL Hypervolume Change", run_ppo_optimization_hv, "pink", True),
         # OptimizationMethod("RL Hypervolume Change Informed", run_ppo_optimization_hv_informed, "red", True),
         # OptimizationMethod("RL Multi-Objective", run_ppo_optimization_multi, "cyan", True),
-        OptimizationMethod("Warm Start GA", run_warm_start_ga, "limegreen", True),
-        OptimizationMethod("Design Repair", run_design_repair, "red", True),
-        OptimizationMethod("Intelligent Mutation GA", run_intelligent_mutation_ga, "cyan", True),
-        OptimizationMethod("Warm Start Intelligent Mutation GA", run_warm_start_intelligent_ga, "magenta", True),
-        OptimizationMethod("AOS GA Policy", run_aos_ga, "darkgreen", True),
+        # OptimizationMethod("Warm Start GA", run_warm_start_ga, "limegreen", True),
+        # OptimizationMethod("Design Repair PPO", run_design_repair, "red", True),
+        # OptimizationMethod("Intelligent Mutation GA", run_intelligent_mutation_ga, "cyan", True),
+        # OptimizationMethod("Warm Start Intelligent Mutation GA", run_warm_start_intelligent_ga, "magenta", True),
+        # OptimizationMethod("AOS GA Policy", run_aos_ga, "darkgreen", True),
         # OptimizationMethod("AOS GA Classical", run_aos_ga, "dodgerblue", True),
-        OptimizationMethod("AOS GA Small", run_aos_ga_small, "darkgreen", True),
-        OptimizationMethod("Transfer Learning Informed State", run_transfer_learning_informed_state, "darkorange", True),
+        # OptimizationMethod("AOS GA Small", run_aos_ga_small, "darkslateblue", True),
+        OptimizationMethod("Transfer Learning Design Synthesis", run_transfer_learning_informed_state, "darkgoldenrod", True),
         OptimizationMethod("Transfer Learning Design Repair", run_transfer_learning_design_repair, "darkred", True),
     ]
     return methods
@@ -154,10 +154,10 @@ def store_results(storage, method_name, results):
 def truncate_data(storage, methods):
     """Truncate data for all methods to the same size"""
     truncate_names = {
-        "Genetic Algorithm", "Warm Start GA", "Design Repair",
+        "Genetic Algorithm", "Warm Start GA", "Design Repair PPO",
         "Intelligent Mutation GA", "Warm Start Intelligent Mutation GA",
         # NEW:
-        "AOS GA",
+        "AOS GA Policy", "AOS GA Small"
         "Transfer Learning Design Repair",
     }
     for method in methods:
@@ -360,9 +360,9 @@ def force_clear_memory():
 
 def _model_key(method_name: str) -> str:
     """Return the model filename stem for a given method."""
-    if method_name == "RL Informed Env":
+    if method_name == "Design Synthesis PPO":
         return "actor_model.pth"
-    elif method_name == "Design Repair":
+    elif method_name == "Design Repair PPO":
         return "actor_spacecraft_repair_model.pth"
     return ""
 
@@ -406,7 +406,7 @@ def main():
         # ---- NEW: Optional path to load pre-trained artifacts ----
         # Set to None to run everything from scratch.
         # Set to a results folder string to load max_values and actor models from it.
-        'pretrained_artifacts_path': "results/2026-06-02_09-48-56", # "results/2026-06-01_16-55-05", # 'results/2026-05-04_13-51-50',
+        'pretrained_artifacts_path': 'results/2026-06-05_11-07-28', # 'results/2026-05-04_13-51-50',
     }
 
     component_list, transfer_learning_components = getComponents()
@@ -455,17 +455,20 @@ def main():
 
             elif method.requires_max_values and max_values is not None:
                 # Pass best_hv so the method knows what to beat for model saving
-                result = method.function(
-                    max_values, params, eval_function,
-                    run_idx=run_idx, best_hv_so_far=best_hv
-                )
+                if method.name in ("Design Synthesis PPO", "Design Repair PPO"):
+                    result = method.function(
+                        max_values, params, eval_function,
+                        run_idx=run_idx, best_hv_so_far=best_hv
+                    )
+                else:
+                    result = method.function(max_values, params, eval_function)
 
                 if result is None:
                     print(f"Warning: {method.name} run {run_idx} returned None")
                     continue
 
                 # Methods that track best model return best_hv alongside results
-                if method.name in ("RL Informed Env", "Design Repair"):
+                if method.name in ("Design Synthesis PPO", "Design Repair PPO"):
                     (all_des, all_obj, pareto_front_des,
                      pareto_front_obj, hypervolumes, NFE, run_best_hv) = result
 
@@ -501,7 +504,7 @@ def main():
             save_max_values(max_values, params)
             print(f"\nCombined max_values across {num_runs} run(s): {max_values}")
 
-        if method.name in ("RL Informed Env", "Design Repair") and best_hv > -np.inf:
+        if method.name in ("Design Synthesis PPO", "Design Repair PPO") and best_hv > -np.inf:
             print(f"\nBest HV for {method.name} across all runs: {best_hv:.6f}")
             print(f"Best model saved to: results/{params['date_str']}/best_{_model_key(method.name)}")
 

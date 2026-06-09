@@ -59,7 +59,7 @@ def run_transfer_learning_design_repair(max_values, params, eval_function):
     total_nfe_budget = epochs * mini_batch_size
     # pretrain_nfe_total = int(total_nfe_budget * pretrain_fraction)
     # pretrain_nfe_per_set = max(mini_batch_size, pretrain_nfe_total // len(transfer_component_sets))
-    pretrain_nfe_per_set = 5000 # 5000 # Fixed pre-training NFE per transfer set based on when we see convergence in experiments. Adjust as needed.
+    pretrain_nfe_per_set = 6400 # 5000 # Fixed pre-training NFE per transfer set based on when we see convergence in experiments. Adjust as needed.
 
     # ============================================================
     # Phase 1: Pre-training
