@@ -96,7 +96,7 @@ def run_transfer_learning_informed_state(max_objectives, params, eval_function):
     # pretrain_epochs_total = int(epochs * pretrain_fraction)
     # pretrain_epochs_per_set = max(1, pretrain_epochs_total // len(transfer_component_sets))
     # finetune_epochs = epochs - pretrain_epochs_total
-    pretrain_epochs_per_set = 5000 # 5000
+    pretrain_epochs_per_set = 200 # 6400 total nfe
     pretrain_epochs_total = pretrain_epochs_per_set * len(transfer_component_sets)
 
     # ============================================================

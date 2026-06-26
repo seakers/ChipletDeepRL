@@ -11,3 +11,6 @@ chiplet_model/dse/lib/__pycache__/
 chiplet_model/dse/chiplet_library/__pycache__/
 chiplet_model/dse/chiplet_library/chiplet-actuary/ChipletHL/__pycache__/
 chiplet_model/dse/lib/__pycache__/
+
+logs/*
+!logs/.gitkeep

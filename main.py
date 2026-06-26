@@ -43,8 +43,8 @@ class OptimizationMethod:
 def initialize_methods():
     """Initialize all optimization methods with their properties"""
     methods = [
-        OptimizationMethod("Random Search", run_random_search, "blue", False),
-        OptimizationMethod("Genetic Algorithm", run_genetic_algorithm, "orange", True),
+        # OptimizationMethod("Random Search", run_random_search, "blue", False),
+        # OptimizationMethod("Genetic Algorithm", run_genetic_algorithm, "orange", True),
         # OptimizationMethod("RL Standard", run_ppo_optimization_random, "pink", True),
         # OptimizationMethod("Design Synthesis PPO", run_ppo_optimization_informed_state, "purple", True),
         # OptimizationMethod("RL Informed Attention", run_ppo_optimization_informed_attn, "brown", True),
@@ -360,9 +360,9 @@ def force_clear_memory():
 
 def _model_key(method_name: str) -> str:
     """Return the model filename stem for a given method."""
-    if method_name == "RL Informed Env":
+    if method_name == "Design Synthesis PPO":
         return "actor_model.pth"
-    elif method_name == "Design Repair":
+    elif method_name == "Design Repair PPO":
         return "actor_spacecraft_repair_model.pth"
     return ""
 
@@ -455,7 +455,7 @@ def main():
 
             elif method.requires_max_values and max_values is not None:
                 # Pass best_hv so the method knows what to beat for model saving
-                if method.name in ("RL Informed Env", "Design Repair"):
+                if method.name in ("Design Synthesis PPO", "Design Repair PPO"):
                     result = method.function(
                         max_values, params, eval_function,
                         run_idx=run_idx, best_hv_so_far=best_hv
@@ -468,7 +468,7 @@ def main():
                     continue
 
                 # Methods that track best model return best_hv alongside results
-                if method.name in ("RL Informed Env", "Design Repair"):
+                if method.name in ("Design Synthesis PPO", "Design Repair PPO"):
                     (all_des, all_obj, pareto_front_des,
                      pareto_front_obj, hypervolumes, NFE, run_best_hv) = result
 
@@ -504,7 +504,7 @@ def main():
             save_max_values(max_values, params)
             print(f"\nCombined max_values across {num_runs} run(s): {max_values}")
 
-        if method.name in ("RL Informed Env", "Design Repair") and best_hv > -np.inf:
+        if method.name in ("Design Synthesis PPO", "Design Repair PPO") and best_hv > -np.inf:
             print(f"\nBest HV for {method.name} across all runs: {best_hv:.6f}")
             print(f"Best model saved to: results/{params['date_str']}/best_{_model_key(method.name)}")
 
