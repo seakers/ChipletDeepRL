@@ -4,7 +4,7 @@ import pickle
 from utils.config_utils import getCube
 
 
-def config_visualization(struct_panels, component_list, date_str, method):
+def config_visualization(struct_panels, component_list, date_str, method, interactive=False):
 
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
@@ -29,8 +29,10 @@ def config_visualization(struct_panels, component_list, date_str, method):
             xPanel, yPanel, zPanel = getCube(panel.dimensions, panel.location, panel.orientation)
             ax.plot_surface(xPanel, yPanel, zPanel, alpha=0.1, color='tab:gray')
 
-    plt.title("Visualization of Configuration RS")
+    plt.title("Visualization of Configuration "+ method)
     # plt.legend(proxyPointsRS, allTypesRS, loc='center left', bbox_to_anchor=(1.1, 0.5))
 
     plt.savefig(f"results/{date_str}/{method}_Config")
+    if interactive:
+        plt.show()
     pickle.dump(fig, open(f"results/{date_str}/{method}_Config_Interactive", "wb"))

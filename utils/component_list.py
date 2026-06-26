@@ -34,9 +34,9 @@ def getComponents():
         # ],
 
     componentList = [
-        Component(type="solar panel", mass=1.5, dimensions=[.2,.5,.01], heatDisp=1.5, pointing=True),
-        Component(type="solar panel", mass=1.6, dimensions=[.21,.52,.01], heatDisp=1.6, pointing=True),
-        Component(type="solar panel", mass=1.4, dimensions=[.19,.49,.01], heatDisp=1.4, pointing=True),
+        Component(type="solar panel", mass=1.5, dimensions=[.2,.5,.01], heatDisp=0.0, pointing=True),
+        Component(type="solar panel", mass=1.6, dimensions=[.21,.52,.01], heatDisp=0.0, pointing=True),
+        Component(type="solar panel", mass=1.4, dimensions=[.19,.49,.01], heatDisp=0.0, pointing=True),
 
         Component(type="payload", mass=6.5, dimensions=[.3,.24,.22], heatDisp=3.2, pointing=True),
         Component(type="payload", mass=5.5, dimensions=[.28,.22,.2], heatDisp=3, pointing=True),
@@ -44,12 +44,12 @@ def getComponents():
         Component(type="transmitter", mass=3.8, dimensions=[.25,.1,.08], heatDisp=12, pointing=True),
         Component(type="transmitter", mass=4.0, dimensions=[.23,.12,.09], heatDisp=11, pointing=True),
 
-        Component(type="receiver", mass=3.3, dimensions=[.21,.12,.05], heatDisp=9, pointing=True),
-        Component(type="receiver", mass=3.5, dimensions=[.22,.13,.06], heatDisp=9.5, pointing=True),
+        Component(type="receiver", mass=3.3, dimensions=[.21,.12,.05], heatDisp=1.2, pointing=True),
+        Component(type="receiver", mass=3.5, dimensions=[.22,.13,.06], heatDisp=1.5, pointing=True),
 
-        Component(type="antenna", mass=4.5, dimensions=[.35,.14,.12], heatDisp=9.7, pointing=True),
-        Component(type="antenna", mass=3.2, dimensions=[.24,.1,.08], heatDisp=8, pointing=True),
-        Component(type="antenna", mass=4.0, dimensions=[.34,.15,.1], heatDisp=9, pointing=True),
+        Component(type="antenna", mass=4.5, dimensions=[.35,.14,.12], heatDisp=0.2, pointing=True),
+        Component(type="antenna", mass=3.2, dimensions=[.24,.1,.08], heatDisp=0.2, pointing=True),
+        Component(type="antenna", mass=4.0, dimensions=[.34,.15,.1], heatDisp=0.2, pointing=True),
 
         Component(type="star tracker", mass=1.7, dimensions=[.11,.13,.1], heatDisp=1.3, pointing=True),
         Component(type="star tracker", mass=1.8, dimensions=[.12,.14,.11], heatDisp=1.4, pointing=True),
@@ -68,19 +68,19 @@ def getComponents():
         Component(type="OBDH", mass=9, dimensions=[.24,.19,.16], heatDisp=5.8, pointing=False),
         Component(type="OBDH", mass=8.8, dimensions=[.23,.18,.15], heatDisp=5.7, pointing=False),
 
-        Component(type="reaction wheel", mass=3, dimensions=[.14,.12,.1], heatDisp=3.2, pointing=False),
-        Component(type="reaction wheel", mass=3.2, dimensions=[.15,.13,.11], heatDisp=3.3, pointing=False),
+        Component(type="reaction wheel", mass=3, dimensions=[.14,.12,.1], heatDisp=8.0, pointing=False),
+        Component(type="reaction wheel", mass=3.2, dimensions=[.15,.13,.11], heatDisp=8.5, pointing=False),
 
-        Component(type="propellant tank", mass=13, dimensions=[.3,.25,.2], heatDisp=4.2, pointing=False),
-        Component(type="propellant tank", mass=12.5, dimensions=[.29,.24,.19], heatDisp=4.1, pointing=False),
+        Component(type="propellant tank", mass=13, dimensions=[.3,.25,.2], heatDisp=0.0, pointing=False),
+        Component(type="propellant tank", mass=12.5, dimensions=[.29,.24,.19], heatDisp=0.0, pointing=False),
 
         Component(type="attitude thruster", mass=2.5, dimensions=[.15,.14,.12], heatDisp=4.8, pointing=True),
         Component(type="attitude thruster", mass=2.7, dimensions=[.16,.15,.13], heatDisp=5, pointing=True),
 
-        Component(type="IMU", mass=2.5, dimensions=[.14,.12,.09], heatDisp=2.5, pointing=False),
-        Component(type="IMU", mass=2.4, dimensions=[.13,.11,.08], heatDisp=2.4, pointing=False),
+        Component(type="IMU", mass=2.5, dimensions=[.14,.12,.09], heatDisp=5.0, pointing=False),
+        Component(type="IMU", mass=2.4, dimensions=[.13,.11,.08], heatDisp=4.8, pointing=False),
 
-        Component(type="atomic clock", mass=1.8, dimensions=[.12,.11,.07], heatDisp=1.6, pointing=False),
+        Component(type="atomic clock", mass=1.8, dimensions=[.12,.11,.07], heatDisp=10.0, pointing=False),
 
         Component(type="heater", mass=1.2, dimensions=[.09,.07,.05], heatDisp=1.9, pointing=False),
         Component(type="heater", mass=1.3, dimensions=[.1,.08,.06], heatDisp=2, pointing=False),

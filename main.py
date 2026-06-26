@@ -46,20 +46,20 @@ def initialize_methods():
         OptimizationMethod("Random Search", run_random_search, "blue", False),
         OptimizationMethod("Genetic Algorithm", run_genetic_algorithm, "orange", True),
         # OptimizationMethod("RL Standard", run_ppo_optimization_random, "pink", True),
-        OptimizationMethod("RL Informed Env", run_ppo_optimization_informed_state, "purple", True),
+        # OptimizationMethod("Design Synthesis PPO", run_ppo_optimization_informed_state, "purple", True),
         # OptimizationMethod("RL Informed Attention", run_ppo_optimization_informed_attn, "brown", True),
         # OptimizationMethod("RL Hypervolume Change", run_ppo_optimization_hv, "pink", True),
         # OptimizationMethod("RL Hypervolume Change Informed", run_ppo_optimization_hv_informed, "red", True),
         # OptimizationMethod("RL Multi-Objective", run_ppo_optimization_multi, "cyan", True),
-        OptimizationMethod("Warm Start GA", run_warm_start_ga, "limegreen", True),
-        OptimizationMethod("Design Repair", run_design_repair, "red", True),
-        OptimizationMethod("Intelligent Mutation GA", run_intelligent_mutation_ga, "cyan", True),
-        OptimizationMethod("Warm Start Intelligent Mutation GA", run_warm_start_intelligent_ga, "magenta", True),
-        OptimizationMethod("AOS GA Policy", run_aos_ga, "darkgreen", True),
+        # OptimizationMethod("Warm Start GA", run_warm_start_ga, "green", True),
+        # OptimizationMethod("Design Repair PPO", run_design_repair, "red", True),
+        # OptimizationMethod("Intelligent Mutation GA", run_intelligent_mutation_ga, "cyan", True),
+        # OptimizationMethod("Warm Start Intelligent Mutation GA", run_warm_start_intelligent_ga, "magenta", True),
+        # OptimizationMethod("AOS GA Policy", run_aos_ga, "darkgreen", True),
         # OptimizationMethod("AOS GA Classical", run_aos_ga, "dodgerblue", True),
-        OptimizationMethod("AOS GA Small", run_aos_ga_small, "darkgreen", True),
-        OptimizationMethod("Transfer Learning Informed State", run_transfer_learning_informed_state, "darkorange", True),
-        OptimizationMethod("Transfer Learning Design Repair", run_transfer_learning_design_repair, "darkred", True),
+        # OptimizationMethod("AOS GA Small", run_aos_ga_small, "darkgreen", True),
+        # OptimizationMethod("Transfer Learning Informed State", run_transfer_learning_informed_state, "darkorange", True),
+        # OptimizationMethod("Transfer Learning Design Repair", run_transfer_learning_design_repair, "darkred", True),
     ]
     return methods
 
@@ -154,10 +154,10 @@ def store_results(storage, method_name, results):
 def truncate_data(storage, methods):
     """Truncate data for all methods to the same size"""
     truncate_names = {
-        "Genetic Algorithm", "Warm Start GA", "Design Repair",
+        "Genetic Algorithm", "Warm Start GA", "Design Repair PPO",
         "Intelligent Mutation GA", "Warm Start Intelligent Mutation GA",
         # NEW:
-        "AOS GA",
+        "AOS GA Policy", "AOS GA Small",
         "Transfer Learning Design Repair",
     }
     for method in methods:
@@ -220,7 +220,7 @@ def plot_hypervolumes(storage, methods, params):
     plt.close()
 
 
-def visualize_configurations(storage, methods, params, eval_function, max_designs=5):
+def visualize_configurations(storage, methods, params, eval_function, max_designs=5, interactive=False):
     """Visualize configurations for final Pareto front designs from each method"""
     for method in methods:
         method_key = method.name.replace(" ", "_").lower()
@@ -233,7 +233,7 @@ def visualize_configurations(storage, methods, params, eval_function, max_design
             for i, design in enumerate(final_pareto_designs):
                 try:
                     struct_panels, components = eval_function.get_panels_and_components(design)
-                    config_visualization(struct_panels, components, params['date_str'], f'{method_safe_name}_{i}')
+                    config_visualization(struct_panels, components, params['date_str'], f'{method_safe_name}_{i}', interactive=interactive)
                 except Exception as e:
                     print(f"Error visualizing {method.name} design {i}: {e}")
                 
@@ -387,11 +387,11 @@ def _copy_best_model(method_name: str, run_idx: int, params: dict):
 
 def main():
     # Configuration
-    num_runs = 10
+    num_runs = 1
 
     params = {
-        'num_epochs': 2000,
-        'mini_batch_size': 32,
+        'num_epochs': 1000,
+        'mini_batch_size': 64,
         'gamma': 0.999,
         'lambda': 0.95,
         'learning_rate': 0.001,
@@ -406,7 +406,7 @@ def main():
         # ---- NEW: Optional path to load pre-trained artifacts ----
         # Set to None to run everything from scratch.
         # Set to a results folder string to load max_values and actor models from it.
-        'pretrained_artifacts_path': "results/2026-06-02_09-48-56", # "results/2026-06-01_16-55-05", # 'results/2026-05-04_13-51-50',
+        'pretrained_artifacts_path': None, # "results/2026-06-01_16-55-05", # 'results/2026-05-04_13-51-50',
     }
 
     component_list, transfer_learning_components = getComponents()
@@ -455,10 +455,13 @@ def main():
 
             elif method.requires_max_values and max_values is not None:
                 # Pass best_hv so the method knows what to beat for model saving
-                result = method.function(
-                    max_values, params, eval_function,
-                    run_idx=run_idx, best_hv_so_far=best_hv
-                )
+                if method.name in ("RL Informed Env", "Design Repair"):
+                    result = method.function(
+                        max_values, params, eval_function,
+                        run_idx=run_idx, best_hv_so_far=best_hv
+                    )
+                else:
+                    result = method.function(max_values, params, eval_function)
 
                 if result is None:
                     print(f"Warning: {method.name} run {run_idx} returned None")

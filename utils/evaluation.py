@@ -142,7 +142,8 @@ class Chiplet_Configuration_Design():
         t_local1 = np.dot(axes1, t)
         R = np.dot(axes1, axes2.T)
         R_abs = np.abs(R) + 1e-6
-        epsilon = 1e-6
+        # epsilon = 1e-6
+        epsilon = 1e-9
         for i in range(3):
             ra = half_sizes1[i]
             rb = np.dot(half_sizes2, R_abs[i, :])
@@ -178,33 +179,70 @@ class Chiplet_Configuration_Design():
         return tot_wire_len
 
 
-    def thermal_cost(self, dimensions, locations, heat_disps):
+    def thermal_cost(self, dimensions, locations, heat_disps, struct_dims, struct_locs):
+
+        stefan_boltzmann_const = 5.670374419e-8  # W/m^2K^4
         
-        Qin = np.zeros(len(locations))
-        SA = np.zeros(len(dimensions))
-        for ind, dims in enumerate(dimensions):
-            SA[ind] = 2 * (dims[0] * dims[1] + dims[0] * dims[2] + dims[1] * dims[2])
-        comp_pair_list = itertools.combinations(range(len(locations)), 2)
-        for pair in comp_pair_list:
-            locA = locations[pair[0]]
-            locB = locations[pair[1]]
-            SAA = SA[pair[0]]
-            SAB = SA[pair[1]]
-            heatDispsA = heat_disps[pair[0]]
-            heatDispsB = heat_disps[pair[1]]
-            r = np.sqrt((locA[0] - locB[0]) ** 2 + (locA[1] - locB[1]) ** 2 + (locA[2] - locB[2]) ** 2)
-            distance_sphere = 4 * np.pi * r ** 2
-            if SAA < distance_sphere:
-                Qin[pair[0]] += SAA * heatDispsB / (r ** 2)
-            else:
-                Qin[pair[0]] += heatDispsB
-            if SAB < distance_sphere:
-                Qin[pair[1]] += SAB * heatDispsA / (r ** 2)
-            else:
-                Qin[pair[1]] += heatDispsA
-        Qnet = Qin - np.array(heat_disps)
-        QnetVar = np.var(Qnet)
-        return QnetVar
+        # Key thermal properties - these are the two you need to distinguish
+        absorptivity = 0.35   # alpha - for incoming solar radiation
+        emissivity   = 0.85   # epsilon - for outgoing thermal radiation
+        # NOTE: white paint is a common choice for passive thermal control
+        #       because low alpha/high epsilon gives a cool equilibrium temp
+        
+        # Surface area of structure
+        surf_area = 0
+        for dim in struct_dims[:8]:  # only shell panels, not shelves
+            surf_area += dim[0] * dim[1]
+        
+        # Average sunlit area (sphere approximation = 1/4 total area)
+        average_sunlit_area = surf_area / 4
+        
+        sun_heat_flux = 1361  # W/m^2 (solar constant at 1 AU)
+        
+        # Absorbed solar heat (apply absorptivity here, NOT emissivity)
+        sc_heat_sun = absorptivity * average_sunlit_area * sun_heat_flux
+        
+        # Internal dissipation
+        sc_heat_comps = sum(heat_disps)
+        
+        # Total heat in
+        sc_heat_in = sc_heat_sun + sc_heat_comps
+        
+        # Steady state: Q_in = Q_out
+        # Q_out = emissivity * stefan_boltzmann * surf_area * T^4
+        # Solving for T:
+        temp_kelvin = (sc_heat_in / (emissivity * stefan_boltzmann_const * surf_area)) ** 0.25
+        target = 273.15 + 10
+
+        temp_diff = abs(temp_kelvin - target)
+        
+        return temp_diff
+
+        # Qin = np.zeros(len(locations))
+        # SA = np.zeros(len(dimensions))
+        # for ind, dims in enumerate(dimensions):
+        #     SA[ind] = 2 * (dims[0] * dims[1] + dims[0] * dims[2] + dims[1] * dims[2])
+        # comp_pair_list = itertools.combinations(range(len(locations)), 2)
+        # for pair in comp_pair_list:
+        #     locA = locations[pair[0]]
+        #     locB = locations[pair[1]]
+        #     SAA = SA[pair[0]]
+        #     SAB = SA[pair[1]]
+        #     heatDispsA = heat_disps[pair[0]]
+        #     heatDispsB = heat_disps[pair[1]]
+        #     r = np.sqrt((locA[0] - locB[0]) ** 2 + (locA[1] - locB[1]) ** 2 + (locA[2] - locB[2]) ** 2)
+        #     distance_sphere = 4 * np.pi * r ** 2
+        #     if SAA < distance_sphere:
+        #         Qin[pair[0]] += SAA * heatDispsB / (r ** 2)
+        #     else:
+        #         Qin[pair[0]] += heatDispsB
+        #     if SAB < distance_sphere:
+        #         Qin[pair[1]] += SAB * heatDispsA / (r ** 2)
+        #     else:
+        #         Qin[pair[1]] += heatDispsA
+        # Qnet = Qin - np.array(heat_disps)
+        # QnetVar = np.var(Qnet)
+        # return QnetVar
 
 
     def pointing_obj(self, dimensions, locations, types, orientations, pointing):
@@ -576,7 +614,8 @@ class Chiplet_Configuration_Design():
             dimensions, locations, types, orientations
         )
         thermal_cost_val = self.thermal_cost(
-            dimensions, locations, heat_disps
+            dimensions, locations, heat_disps,
+            struct_dims, struct_locs
         )
 
         cost_list = [

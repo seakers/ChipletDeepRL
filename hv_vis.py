@@ -1,12 +1,24 @@
 from main import *
 
+def initialize_methods_vis():
+    """Initialize all optimization methods with their properties"""
+    methods = [
+        OptimizationMethod("Random Search", run_random_search, "blue", False),
+        OptimizationMethod("Genetic Algorithm", run_genetic_algorithm, "orange", True),
+        OptimizationMethod("Warm Start GA", run_warm_start_ga, "green", True),
+        OptimizationMethod("Design Repair PPO", run_design_repair, "red", True),
+        OptimizationMethod("Intelligent Mutation GA", run_intelligent_mutation_ga, "cyan", True),
+        OptimizationMethod("Warm Start Intelligent Mutation GA", run_warm_start_intelligent_ga, "magenta", True),
+        OptimizationMethod("Design Synthesis PPO", run_ppo_optimization_informed_state, "purple", True),
+    ]
+    return methods
 
 # ============================================================
 # CONFIGURATION
 # ============================================================
 
 # Folder containing 10 runs for ALL methods (including non-GA-hybrid)
-PRIMARY_FOLDER = "results/2026-05-04_13-51-50"
+PRIMARY_FOLDER = "results/hprc_results_2026-06-08"
 PRIMARY_NUM_RUNS = 10
 
 # GA hybrid methods split across multiple folders
@@ -17,9 +29,9 @@ PRIMARY_NUM_RUNS = 10
 #     ("results/2026-05-13_08-50-17", 1),
 # ]
 
-AOS_FOLDER = [
-    ("results/2026-05-17_11-27-22", 10),
-]
+# AOS_FOLDER = [
+#     ("results/2026-05-17_11-27-22", 10),
+# ]
 
 # These are the GA hybrid method names as they appear in your codebase
 # GA_HYBRID_METHODS = {
@@ -28,9 +40,9 @@ AOS_FOLDER = [
 #     "Warm Start Intelligent GA",
 # }
 
-AOS_METHODS = {
-    "AOS GA Policy",
-}
+# AOS_METHODS = {
+#     "AOS GA Policy",
+# }
 
 OUTPUT_FOLDER = "results/combined_visualization"
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
@@ -52,8 +64,8 @@ def load_hv_pareto_from_folder(methods, folder, num_runs):
         method_key = method.name.replace(" ", "_").lower()
         method_key_store = method_key
         print(f"Method Key: {method_key}")
-        if method_key == "aos_ga_policy" or method_key == "aos_ga_classical":
-            method_key = "aos_ga"
+        # if method_key == "aos_ga_policy" or method_key == "aos_ga_classical":
+        #     method_key = "aos_ga"
         storage[method_key_store] = {
             'all_runs_hypervolumes': [],
             'all_runs_pareto_front_obj': [],
@@ -83,12 +95,12 @@ def load_hv_pareto_from_folder(methods, folder, num_runs):
 # ============================================================
 
 print("Loading primary folder...")
-all_methods = initialize_methods()
-primary_methods = [x for x in all_methods if x.name not in AOS_METHODS]
+all_methods = initialize_methods_vis()
+# primary_methods = [x for x in all_methods if x.name not in AOS_METHODS]
 primary_params = {'date_str': PRIMARY_FOLDER.replace("results/", "")}
 
 # Use the existing utility directly
-storage_combined = load_hv_pareto_from_folder(primary_methods, PRIMARY_FOLDER, PRIMARY_NUM_RUNS)
+storage_combined = load_hv_pareto_from_folder(all_methods, PRIMARY_FOLDER, PRIMARY_NUM_RUNS)
 
 # Remove GA hybrid data from the primary folder load —
 # we'll replace it with the aggregated version from the split folders
@@ -112,11 +124,11 @@ print("Primary folder loaded.")
 # STEP 2: Load and aggregate GA hybrid runs from split folders
 # ============================================================
 
-print("Loading GA hybrid split folders...")
+# print("Loading GA hybrid split folders...")
 
 # Only load the GA hybrid methods from the split folders
 # ga_hybrid_method_objs = [m for m in all_methods if m.name in GA_HYBRID_METHODS]
-aos_method_objs = [m for m in all_methods if m.name in AOS_METHODS]
+# aos_method_objs = [m for m in all_methods if m.name in AOS_METHODS]
 
 # for folder, num_runs in GA_HYBRID_FOLDERS:
 #     print(f"  Loading {num_runs} run(s) from {folder}...")
@@ -134,30 +146,30 @@ aos_method_objs = [m for m in all_methods if m.name in AOS_METHODS]
 #             folder_storage[key]['all_runs_NFE']
 #         )
 
-for folder, num_runs in AOS_FOLDER:
-    print(f"  Loading {num_runs} run(s) from {folder}...")
-    folder_storage = load_hv_pareto_from_folder(aos_method_objs, folder, num_runs)
+# for folder, num_runs in AOS_FOLDER:
+#     print(f"  Loading {num_runs} run(s) from {folder}...")
+#     folder_storage = load_hv_pareto_from_folder(aos_method_objs, folder, num_runs)
 
-    for method in aos_method_objs:
-        key = method.name.replace(" ", "_").lower()
-        storage_combined[key] = {
-            'all_runs_hypervolumes': [],
-            'all_runs_pareto_front_obj': [],
-            'all_runs_NFE': [],
-            # These are not in lightweight HV/Pareto files, left empty
-            'all_runs_des': [],
-            'all_runs_obj': [],
-            'all_runs_pareto_front_des': [],
-        }
-        storage_combined[key]['all_runs_hypervolumes'].extend(
-            folder_storage[key]['all_runs_hypervolumes']
-        )
-        storage_combined[key]['all_runs_pareto_front_obj'].extend(
-            folder_storage[key]['all_runs_pareto_front_obj']
-        )
-        storage_combined[key]['all_runs_NFE'].extend(
-            folder_storage[key]['all_runs_NFE']
-        )
+#     for method in aos_method_objs:
+#         key = method.name.replace(" ", "_").lower()
+#         storage_combined[key] = {
+#             'all_runs_hypervolumes': [],
+#             'all_runs_pareto_front_obj': [],
+#             'all_runs_NFE': [],
+#             # These are not in lightweight HV/Pareto files, left empty
+#             'all_runs_des': [],
+#             'all_runs_obj': [],
+#             'all_runs_pareto_front_des': [],
+#         }
+#         storage_combined[key]['all_runs_hypervolumes'].extend(
+#             folder_storage[key]['all_runs_hypervolumes']
+#         )
+#         storage_combined[key]['all_runs_pareto_front_obj'].extend(
+#             folder_storage[key]['all_runs_pareto_front_obj']
+#         )
+#         storage_combined[key]['all_runs_NFE'].extend(
+#             folder_storage[key]['all_runs_NFE']
+#         )
 
 # Verify run counts
 print("\nRun counts after aggregation:")
@@ -192,11 +204,16 @@ def plot_hypervolumes_post(storage, methods, output_folder):
 
         if hypervolumes.size > 0:
             stats = calculate_statistics(hypervolumes)
+            print(
+                f"{method.name} - Final Median HV: {stats['median'][-1]:.4f} | "
+                f"IQR: {stats['q25'][-1]:.4f}-{stats['q75'][-1]:.4f} | "
+                f"Min: {stats['min'][-1]:.4f} | Max: {stats['max'][-1]:.4f}"
+            )
             label = method.name
-            if method.name == 'RL Informed Env':
-                label = 'Design Synthesis PPO'
-            if method.name == 'Design Repair':
-                label = 'Design Repair PPO'
+            # if method.name == 'RL Informed Env':
+            #     label = 'Design Synthesis PPO'
+            # if method.name == 'Design Repair':
+            #     label = 'Design Repair PPO'
             
             # Plot lines
             # plt.plot(stats['max'], label=f'{method.name} Max', color=method.color, linestyle='--', alpha=0.8)

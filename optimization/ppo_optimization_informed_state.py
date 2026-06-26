@@ -28,9 +28,9 @@ def run_ppo_optimization_informed_state(max_objectives, params, eval_function, r
     des_space = eval_function.design_space
     unique_des_space = eval_function.unique_des_space
     num_actions = len(des_space)
-    num_objectives = eval_function.num_objectives + 1 # plus one for constraint violation signal
+    num_objectives = eval_function.num_objectives # plus one for constraint violation signal
 
-    actor, critic = get_models(num_actions, device, params, unique_des_space, num_objectives, eval_function.component_list)
+    actor, critic = get_models(num_actions, device, params, unique_des_space, num_objectives+1, eval_function.component_list)
 
     NFE = 0
     all_des = []
