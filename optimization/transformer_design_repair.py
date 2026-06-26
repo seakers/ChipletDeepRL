@@ -9,7 +9,7 @@ import math
 class PositionalEncoding(nn.Module):
     """Positional encoding for transformer - same as truss version [5]"""
     
-    def __init__(self, d_model, dropout=0.1, max_len=10000):
+    def __init__(self, d_model, dropout=0.1, max_len=20000):
         super(PositionalEncoding, self).__init__()
         self.dropout = nn.Dropout(p=dropout)
 

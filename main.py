@@ -46,20 +46,20 @@ def initialize_methods():
         # OptimizationMethod("Random Search", run_random_search, "blue", False),
         # OptimizationMethod("Genetic Algorithm", run_genetic_algorithm, "orange", True),
         # OptimizationMethod("RL Standard", run_ppo_optimization_random, "pink", True),
-        # OptimizationMethod("Design Synthesis PPO", run_ppo_optimization_informed_state, "purple", True),
+        OptimizationMethod("Design Synthesis PPO", run_ppo_optimization_informed_state, "purple", True),
         # OptimizationMethod("RL Informed Attention", run_ppo_optimization_informed_attn, "brown", True),
         # OptimizationMethod("RL Hypervolume Change", run_ppo_optimization_hv, "pink", True),
         # OptimizationMethod("RL Hypervolume Change Informed", run_ppo_optimization_hv_informed, "red", True),
         # OptimizationMethod("RL Multi-Objective", run_ppo_optimization_multi, "cyan", True),
-        # OptimizationMethod("Warm Start GA", run_warm_start_ga, "limegreen", True),
-        # OptimizationMethod("Design Repair PPO", run_design_repair, "red", True),
-        # OptimizationMethod("Intelligent Mutation GA", run_intelligent_mutation_ga, "cyan", True),
-        # OptimizationMethod("Warm Start Intelligent Mutation GA", run_warm_start_intelligent_ga, "magenta", True),
+        OptimizationMethod("Warm Start GA", run_warm_start_ga, "limegreen", True),
+        OptimizationMethod("Design Repair PPO", run_design_repair, "red", True),
+        OptimizationMethod("Intelligent Mutation GA", run_intelligent_mutation_ga, "cyan", True),
+        OptimizationMethod("Warm Start Intelligent Mutation GA", run_warm_start_intelligent_ga, "magenta", True),
         # OptimizationMethod("AOS GA Policy", run_aos_ga, "darkgreen", True),
         # OptimizationMethod("AOS GA Classical", run_aos_ga, "dodgerblue", True),
         # OptimizationMethod("AOS GA Small", run_aos_ga_small, "darkslateblue", True),
-        OptimizationMethod("Transfer Learning Design Synthesis", run_transfer_learning_informed_state, "darkgoldenrod", True),
-        OptimizationMethod("Transfer Learning Design Repair", run_transfer_learning_design_repair, "darkred", True),
+        # OptimizationMethod("Transfer Learning Design Synthesis", run_transfer_learning_informed_state, "darkgoldenrod", True),
+        # OptimizationMethod("Transfer Learning Design Repair", run_transfer_learning_design_repair, "darkred", True),
     ]
     return methods
 
@@ -391,7 +391,7 @@ def main():
 
     params = {
         'num_epochs': 2000,
-        'mini_batch_size': 32,
+        'mini_batch_size': 64,
         'gamma': 0.999,
         'lambda': 0.95,
         'learning_rate': 0.001,
@@ -406,7 +406,7 @@ def main():
         # ---- NEW: Optional path to load pre-trained artifacts ----
         # Set to None to run everything from scratch.
         # Set to a results folder string to load max_values and actor models from it.
-        'pretrained_artifacts_path': 'results/2026-06-05_11-07-28', # 'results/2026-05-04_13-51-50',
+        'pretrained_artifacts_path': 'results/2026-06-23_14-45-52', # 'results/2026-05-04_13-51-50',
     }
 
     component_list, transfer_learning_components = getComponents()
