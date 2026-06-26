@@ -31,12 +31,21 @@ class Chiplet_Configuration_Design():
 
         for i in range(self.num_components):
             self.design_space.append({'type': 'discrete', 'range': [i for i in range(8 + 2*self.max_shelves)]}) # Panel choice. Max 8 for shell, and 10 for shelves (one for each side of each shelf). 18 options max, constraint will be violated for choosing a nonexistant panel
-            self.design_space.append({'type': 'continuous', 'range': [-1, 1]}) # Component x loc
-            self.design_space.append({'type': 'continuous', 'range': [-1, 1]}) # Component y loc
+            self.design_space.append({'type': 'discrete', 'range': [ -1 + 2*i/100.0 for i in range(101)]}) # Component x loc (101 options from -1 to 1)
+            self.design_space.append({'type': 'discrete', 'range': [ -1 + 2*i/100.0 for i in range(101)]}) # Component y loc
             self.design_space.append({'type': 'discrete', 'range': [i for i in range(6)]}) # choose which face to attach to panel
-            self.design_space.append({'type': 'continuous', 'range': [0, 2*np.pi]}) # rotation of component about normal of panel
+            self.design_space.append({'type': 'discrete', 'range': [2*np.pi*i/36 for i in range(36)]}) # rotation of component about normal of panel
             if i == 0:
                 self.unique_des_space = deepcopy(self.design_space)
+
+        # for i in range(self.num_components):
+        #     self.design_space.append({'type': 'discrete', 'range': [i for i in range(8 + 2*self.max_shelves)]}) # Panel choice. Max 8 for shell, and 10 for shelves (one for each side of each shelf). 18 options max, constraint will be violated for choosing a nonexistant panel
+        #     self.design_space.append({'type': 'continuous', 'range': [-1, 1]}) # Component x loc
+        #     self.design_space.append({'type': 'continuous', 'range': [-1, 1]}) # Component y loc
+        #     self.design_space.append({'type': 'discrete', 'range': [i for i in range(6)]}) # choose which face to attach to panel
+        #     self.design_space.append({'type': 'continuous', 'range': [0, 2*np.pi]}) # rotation of component about normal of panel
+        #     if i == 0:
+        #         self.unique_des_space = deepcopy(self.design_space)
 
         self.n_variables = len(self.design_space)
 

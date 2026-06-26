@@ -43,18 +43,18 @@ class OptimizationMethod:
 def initialize_methods():
     """Initialize all optimization methods with their properties"""
     methods = [
-        # OptimizationMethod("Random Search", run_random_search, "blue", False),
-        # OptimizationMethod("Genetic Algorithm", run_genetic_algorithm, "orange", True),
+        OptimizationMethod("Random Search", run_random_search, "blue", False),
+        OptimizationMethod("Genetic Algorithm", run_genetic_algorithm, "orange", True),
         # OptimizationMethod("RL Standard", run_ppo_optimization_random, "pink", True),
-        # OptimizationMethod("Design Synthesis PPO", run_ppo_optimization_informed_state, "purple", True),
+        OptimizationMethod("Design Synthesis PPO", run_ppo_optimization_informed_state, "purple", True),
         # OptimizationMethod("RL Informed Attention", run_ppo_optimization_informed_attn, "brown", True),
         # OptimizationMethod("RL Hypervolume Change", run_ppo_optimization_hv, "pink", True),
         # OptimizationMethod("RL Hypervolume Change Informed", run_ppo_optimization_hv_informed, "red", True),
         # OptimizationMethod("RL Multi-Objective", run_ppo_optimization_multi, "cyan", True),
-        # OptimizationMethod("Warm Start GA", run_warm_start_ga, "green", True),
-        # OptimizationMethod("Design Repair PPO", run_design_repair, "red", True),
-        # OptimizationMethod("Intelligent Mutation GA", run_intelligent_mutation_ga, "cyan", True),
-        # OptimizationMethod("Warm Start Intelligent Mutation GA", run_warm_start_intelligent_ga, "magenta", True),
+        OptimizationMethod("Warm Start GA", run_warm_start_ga, "green", True),
+        OptimizationMethod("Design Repair PPO", run_design_repair, "red", True),
+        OptimizationMethod("Intelligent Mutation GA", run_intelligent_mutation_ga, "cyan", True),
+        OptimizationMethod("Warm Start Intelligent Mutation GA", run_warm_start_intelligent_ga, "magenta", True),
         # OptimizationMethod("AOS GA Policy", run_aos_ga, "darkgreen", True),
         # OptimizationMethod("AOS GA Classical", run_aos_ga, "dodgerblue", True),
         # OptimizationMethod("AOS GA Small", run_aos_ga_small, "darkgreen", True),
@@ -390,8 +390,8 @@ def main():
     num_runs = 1
 
     params = {
-        'num_epochs': 1000,
-        'mini_batch_size': 64,
+        'num_epochs': 5,
+        'mini_batch_size': 4,
         'gamma': 0.999,
         'lambda': 0.95,
         'learning_rate': 0.001,
