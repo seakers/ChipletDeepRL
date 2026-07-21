@@ -476,10 +476,10 @@ def generate_initial_designs(all_des, all_obj, all_constraints, all_constraint_v
     Generate random initial designs for spacecraft configuration.
     Handles both continuous and discrete design variables.
     """
-    valid_designs = []
+    init_designs = []
     obj_values = []
     
-    while len(valid_designs) < num_designs:
+    for _ in range(num_designs):
         # Generate random design based on design space specification
 
         design = []
@@ -505,18 +505,16 @@ def generate_initial_designs(all_des, all_obj, all_constraints, all_constraint_v
         objs, is_constrained, constraint_vals = eval_function.evaluate(design)
         NFE += 1
         
+        init_designs.append(design)
+        obj_values.append(objs)
+        
         # Track all designs (including invalid ones for learning)
         all_des.append(design)
         all_obj.append(objs)
         all_constraints.append(is_constrained)
         all_constraint_vals.append(constraint_vals)
         
-        # Only keep valid designs for initial batch
-        if not is_constrained:
-            valid_designs.append(design)
-            obj_values.append(objs)
-            
-    return valid_designs, obj_values, all_des, all_obj, all_constraints, all_constraint_vals, NFE
+    return init_designs, obj_values, all_des, all_obj, all_constraints, all_constraint_vals, NFE
 
 
 def sample_next_batch(all_des, all_obj, all_constraints, all_constraint_vals, eval_function, 

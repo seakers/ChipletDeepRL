@@ -43,15 +43,15 @@ class OptimizationMethod:
 def initialize_methods():
     """Initialize all optimization methods with their properties"""
     methods = [
-        OptimizationMethod("Random Search", run_random_search, "blue", False),
-        OptimizationMethod("Genetic Algorithm", run_genetic_algorithm, "orange", True),
+        # OptimizationMethod("Random Search", run_random_search, "blue", False),
+        # OptimizationMethod("Genetic Algorithm", run_genetic_algorithm, "orange", True),
         # OptimizationMethod("RL Standard", run_ppo_optimization_random, "pink", True),
-        OptimizationMethod("Design Synthesis PPO", run_ppo_optimization_informed_state, "purple", True),
+        # OptimizationMethod("Design Synthesis PPO", run_ppo_optimization_informed_state, "purple", True),
         # OptimizationMethod("RL Informed Attention", run_ppo_optimization_informed_attn, "brown", True),
         # OptimizationMethod("RL Hypervolume Change", run_ppo_optimization_hv, "pink", True),
         # OptimizationMethod("RL Hypervolume Change Informed", run_ppo_optimization_hv_informed, "red", True),
         # OptimizationMethod("RL Multi-Objective", run_ppo_optimization_multi, "cyan", True),
-        OptimizationMethod("Warm Start GA", run_warm_start_ga, "green", True),
+        # OptimizationMethod("Warm Start GA", run_warm_start_ga, "green", True),
         OptimizationMethod("Design Repair PPO", run_design_repair, "red", True),
         OptimizationMethod("Intelligent Mutation GA", run_intelligent_mutation_ga, "cyan", True),
         OptimizationMethod("Warm Start Intelligent Mutation GA", run_warm_start_intelligent_ga, "magenta", True),
@@ -387,11 +387,11 @@ def _copy_best_model(method_name: str, run_idx: int, params: dict):
 
 def main():
     # Configuration
-    num_runs = 1
+    num_runs = 10
 
     params = {
-        'num_epochs': 5,
-        'mini_batch_size': 4,
+        'num_epochs': 2000,
+        'mini_batch_size': 64,
         'gamma': 0.999,
         'lambda': 0.95,
         'learning_rate': 0.001,
@@ -406,7 +406,7 @@ def main():
         # ---- NEW: Optional path to load pre-trained artifacts ----
         # Set to None to run everything from scratch.
         # Set to a results folder string to load max_values and actor models from it.
-        'pretrained_artifacts_path': None, # "results/2026-06-01_16-55-05", # 'results/2026-05-04_13-51-50',
+        'pretrained_artifacts_path': 'results/2026-06-26_11-51-12', # "results/2026-06-01_16-55-05", # 'results/2026-05-04_13-51-50',
     }
 
     component_list, transfer_learning_components = getComponents()

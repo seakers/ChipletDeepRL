@@ -6,14 +6,15 @@
 #SBATCH --cpus-per-task=16
 #SBATCH --gres=gpu:a40:1
 #SBATCH --mem=200G
-#SBATCH --time=4-00:00:00
+#SBATCH --time=10:00:00
 #SBATCH --output=logs/%x-%j.out
 #SBATCH --error=logs/%x-%j.err
+#SBATCH --exclude=fc096
 
 set -euo pipefail
 
 module purge
-module restore spa_con_collection
+ml GCCcore/13.2.0 Python/3.11.5
 
 source /scratch/user/demagall/ChipletDeepRL/.venv/bin/activate
 
@@ -46,12 +47,18 @@ echo "Job ID:        $SLURM_JOB_ID"
 echo "Node:          $SLURM_NODELIST"
 echo "CPUs:          $SLURM_CPUS_PER_TASK"
 echo "Memory:        $SLURM_MEM_PER_NODE MB"
-echo "GPU:           $(nvidia-smi --query-gpu=name --format=csv,noheader)"
+echo "GPU:           $(nvidia-smi --query-gpu=name --format=csv,noheader 2>&1 || echo 'WARNING: nvidia-smi failed')"
 echo "Temp dir:      $RUN_TMP"
 echo "=============================="
 
-nvidia-smi
-python -c "import torch; print('torch', torch.__version__, 'cuda', torch.cuda.is_available(), 'device', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'N/A')"
+nvidia-smi || echo "WARNING: nvidia-smi returned non-zero"
+python -c "import torch; print('torch', torch.__version__, 'cuda', torch.cuda.is_available(), 'device', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'N/A')" || echo "WARNING: torch check failed"
+
+# ---- Hard guard: abort if GPU truly missing ----
+if ! nvidia-smi > /dev/null 2>&1; then
+    echo "FATAL: GPU composition failed on $SLURM_NODELIST - exiting"
+    exit 1
+fi
 
 # Print initial memory state
 echo ""
