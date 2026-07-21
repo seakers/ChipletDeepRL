@@ -531,11 +531,8 @@ def sample_next_batch(all_des, all_obj, all_constraints, all_constraint_vals, ev
     num_from_previous = num_designs - num_random
     
     # Generate random designs
-    random_count = 0
-    max_random_attempts = num_random * 10  # Prevent infinite loop
-    attempts = 0
     
-    while random_count < num_random and attempts < max_random_attempts:
+    for _ in range(num_random):
         design = []
         for ind, var in enumerate(des_space):
             if var['type'] == 'continuous':
@@ -557,73 +554,50 @@ def sample_next_batch(all_des, all_obj, all_constraints, all_constraint_vals, ev
         
         objs, is_constrained, constraint_vals = eval_function.evaluate(design)
         NFE += 1
-        attempts += 1
         
         all_des.append(design)
         all_obj.append(objs)
         all_constraints.append(is_constrained)
         all_constraint_vals.append(constraint_vals)
 
-        if not is_constrained:
-            designs.append(design)
-            obj_values.append(objs)
-            random_count += 1
+        designs.append(design)
+        obj_values.append(objs)
     
-    # Sample from valid Pareto front designs
-    valid_indices = [i for i, c in enumerate(all_constraints) if not c]
+    # Sample from Pareto front designs, filling the remainder from non-Pareto designs if needed
     
-    if len(valid_indices) > 0:
-        valid_obj = np.array([all_obj[i] for i in valid_indices])
-        pareto_mask = is_pareto_efficient(valid_obj)
-        pareto_valid_indices = [valid_indices[i] for i, m in enumerate(pareto_mask) if m]
-        
-        if len(pareto_valid_indices) > 0:
-            num_to_sample = min(num_from_previous, len(pareto_valid_indices))
-            sampled_indices = np.random.choice(
-                pareto_valid_indices, 
-                num_to_sample, 
+    pareto_mask = is_pareto_efficient(np.hstack([np.array(all_obj), np.array(all_constraints).reshape(-1, 1)]), return_mask=True)
+    pareto_indices = [i for i, m in enumerate(pareto_mask) if m]
+    selected_indices = []
+    
+    if len(pareto_indices) > 0:
+        num_to_sample = min(num_from_previous, len(pareto_indices))
+        sampled_pareto_indices = np.random.choice(
+            pareto_indices, 
+            num_to_sample, 
+            replace=False
+        )
+        selected_indices.extend(sampled_pareto_indices.tolist())
+        for idx in sampled_pareto_indices:
+            designs.append(all_des[idx].copy() if isinstance(all_des[idx], list) else all_des[idx])
+            obj_values.append(all_obj[idx])
+    
+    remaining_needed = num_from_previous - len(selected_indices)
+    if remaining_needed > 0:
+        available_non_pareto_indices = [
+            idx for idx in range(len(all_obj))
+            if idx not in selected_indices and idx not in pareto_indices
+        ]
+        if len(available_non_pareto_indices) > 0:
+            num_to_fill = min(remaining_needed, len(available_non_pareto_indices))
+            sampled_non_pareto_indices = np.random.choice(
+                available_non_pareto_indices,
+                num_to_fill,
                 replace=False
             )
-            for idx in sampled_indices:
+            selected_indices.extend(sampled_non_pareto_indices.tolist())
+            for idx in sampled_non_pareto_indices:
                 designs.append(all_des[idx].copy() if isinstance(all_des[idx], list) else all_des[idx])
                 obj_values.append(all_obj[idx])
-    
-    # Fill remaining with random valid designs if needed
-    fill_attempts = 0
-    max_fill_attempts = (num_designs - len(designs)) * 10
-    
-    while len(designs) < num_designs and fill_attempts < max_fill_attempts:
-        design = []
-        for ind, var in enumerate(des_space):
-            if var['type'] == 'continuous':
-                design.append(np.random.uniform(var['range'][0], var['range'][1]))
-            elif var['type'] == 'discrete':
-                if ind == 5 or (ind > 5 and (ind - 5) % 5 == 0):  # panel choice indices
-                    structure_id = design[0]
-                    shelves = design[4]
-                    base_panels = {0: 5, 1: 6, 2: 8}[structure_id]
-                    valid_panels = list(range(base_panels))
-                    if not eval_function.component_list[ind//5 - 1].pointing:
-                        valid_panels.extend([i+8 for i in range(shelves)])
-                        valid_panels.extend([i+11 for i in range(shelves)])
-                    design.append(np.random.choice(valid_panels))
-                else:
-                    design.append(np.random.choice(np.array(var['range'])))
-            else:
-                print("INVALID DESIGN SPACE")
-        
-        objs, is_constrained, constraint_vals = eval_function.evaluate(design)
-        NFE += 1
-        fill_attempts += 1
-        
-        all_des.append(design)
-        all_obj.append(objs)
-        all_constraints.append(is_constrained)
-        all_constraint_vals.append(constraint_vals)
-        
-        if not is_constrained:
-            designs.append(design)
-            obj_values.append(objs)
     
     return designs, obj_values, all_des, all_obj, all_constraints, all_constraint_vals, NFE
 
