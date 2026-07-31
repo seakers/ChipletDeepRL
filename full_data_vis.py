@@ -17,9 +17,9 @@ def initialize_methods(storage):
     methods = [
         ("Random Search", "blue"),
         ("Genetic Algorithm", "orange"),
-        ("RL Informed Env", "purple"),
+        ("Design Synthesis PPO", "purple"),
         ("Warm Start GA", "green"),
-        ("Design Repair", "red"),
+        ("Design Repair PPO", "red"),
         ("Intelligent Mutation GA", "cyan"),
         ("Warm Start Intelligent Mutation GA", "magenta"),
     ]

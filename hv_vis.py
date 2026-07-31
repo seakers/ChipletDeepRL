@@ -3,13 +3,15 @@ from main import *
 def initialize_methods_vis():
     """Initialize all optimization methods with their properties"""
     methods = [
-        OptimizationMethod("Random Search", run_random_search, "blue", False),
+        # OptimizationMethod("Random Search", run_random_search, "blue", False),
         OptimizationMethod("Genetic Algorithm", run_genetic_algorithm, "orange", True),
         OptimizationMethod("Warm Start GA", run_warm_start_ga, "green", True),
-        OptimizationMethod("Design Repair PPO", run_design_repair, "red", True),
-        OptimizationMethod("Intelligent Mutation GA", run_intelligent_mutation_ga, "cyan", True),
-        OptimizationMethod("Warm Start Intelligent Mutation GA", run_warm_start_intelligent_ga, "magenta", True),
-        OptimizationMethod("Design Synthesis PPO", run_ppo_optimization_informed_state, "purple", True),
+        # OptimizationMethod("Design Repair", run_design_repair, "red", True),
+        # OptimizationMethod("Intelligent Mutation GA", run_intelligent_mutation_ga, "cyan", True),
+        # OptimizationMethod("Warm Start Intelligent Mutation GA", run_warm_start_intelligent_ga, "magenta", True),
+        # OptimizationMethod("Design Synthesis PPO", run_ppo_optimization_informed_state, "purple", True),
+        # OptimizationMethod("Transfer Learning Informed State", run_transfer_learning_informed_state, "lime", True),
+        # OptimizationMethod("Transfer Learning Design Repair", run_transfer_learning_design_repair, "darkred", True),
     ]
     return methods
 
@@ -18,7 +20,7 @@ def initialize_methods_vis():
 # ============================================================
 
 # Folder containing 10 runs for ALL methods (including non-GA-hybrid)
-PRIMARY_FOLDER = "results/hprc_results_2026-06-08"
+PRIMARY_FOLDER = "results/2026-06-26_11-51-12"
 PRIMARY_NUM_RUNS = 10
 
 # GA hybrid methods split across multiple folders
@@ -44,7 +46,7 @@ PRIMARY_NUM_RUNS = 10
 #     "AOS GA Policy",
 # }
 
-OUTPUT_FOLDER = "results/combined_visualization"
+OUTPUT_FOLDER = "results/combined_visualization_2026-06-26"
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
 
@@ -84,6 +86,7 @@ def load_hv_pareto_from_folder(methods, folder, num_runs):
                 storage[method_key_store]['all_runs_hypervolumes'].append(data['hypervolumes'])
                 storage[method_key_store]['all_runs_pareto_front_obj'].append(data['pareto_front_obj'])
                 storage[method_key_store]['all_runs_NFE'].append(len(data['hypervolumes']))
+                print(f"{method.name} run {run_idx} final HV: {data['hypervolumes'][-1]}")
             else:
                 print(f"  [WARNING] Not found: {filepath}")
 
@@ -199,8 +202,8 @@ def plot_hypervolumes_post(storage, methods, output_folder):
         method_key = method.name.replace(" ", "_").lower()
         hypervolumes = np.array(storage[method_key]['all_runs_hypervolumes'])
 
-        if 'transfer_learning' in method_key:
-            continue
+        # if 'transfer_learning' in method_key:
+            # continue
 
         if hypervolumes.size > 0:
             stats = calculate_statistics(hypervolumes)
@@ -210,10 +213,12 @@ def plot_hypervolumes_post(storage, methods, output_folder):
                 f"Min: {stats['min'][-1]:.4f} | Max: {stats['max'][-1]:.4f}"
             )
             label = method.name
-            # if method.name == 'RL Informed Env':
-            #     label = 'Design Synthesis PPO'
-            # if method.name == 'Design Repair':
-            #     label = 'Design Repair PPO'
+            if method.name == 'RL Informed Env':
+                label = 'Design Synthesis PPO'
+            if method.name == 'Design Repair':
+                label = 'Design Repair PPO'
+            if method.name == 'Transfer Learning Informed State':
+                label = 'Transfer Learning Design Synthesis'
             
             # Plot lines
             # plt.plot(stats['max'], label=f'{method.name} Max', color=method.color, linestyle='--', alpha=0.8)

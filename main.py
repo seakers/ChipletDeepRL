@@ -158,7 +158,7 @@ def truncate_data(storage, methods):
         "Intelligent Mutation GA", "Warm Start Intelligent Mutation GA",
         # NEW:
         "AOS GA Policy", "AOS GA Small",
-        "Transfer Learning Design Repair",
+        "Transfer Learning Design Repair", "Design Repair"
     }
     for method in methods:
         if method.name in truncate_names:

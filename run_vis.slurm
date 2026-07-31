@@ -7,20 +7,20 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
-#SBATCH --mem=360G
+#SBATCH --mem=240G
 
 echo "Job started on $(hostname) at $(date)"
 
 # Load modules
 module purge
-module restore spa_con_collection
+ml GCCcore/13.2.0 Python/3.11.5
 
-source .venv/bin/activate
+source /scratch/user/demagall/ChipletDeepRL/.venv/bin/activate
 
 # Define multiple run data folders
 # FOLDER1="results/2026-03-22_23-11-05/run_data"
 # FOLDER2="results/2026-03-20_19-02-00/run_data"
-OUTPUT_FOLDER="results/combined_analysis"
+OUTPUT_FOLDER="results/combined_analysis_transfer"
 
 # Run with multiple folders
 # python data_vis.py \
