@@ -150,24 +150,32 @@ class Chiplet_Configuration_Design():
         t = np.array(loc2) - np.array(loc1)
         t_local1 = np.dot(axes1, t)
         R = np.dot(axes1, axes2.T)
-        R_abs = np.abs(R) + 1e-6
+        R_abs = np.abs(R) + 1e-9
+        # R_abs = np.abs(R)
         # epsilon = 1e-6
         epsilon = 1e-9
         for i in range(3):
             ra = half_sizes1[i]
             rb = np.dot(half_sizes2, R_abs[i, :])
             if abs(t_local1[i]) > ra + rb - epsilon:
+                # print(f"SEPARATED on face1 axis {i}: {abs(t_local1[i])} > {ra+rb-epsilon}")
                 return False
         for j in range(3):
             ra = np.dot(half_sizes1, R_abs[:, j])
             rb = half_sizes2[j]
             if abs(np.dot(t, axes2[j])) > ra + rb - epsilon:
+                # print(f"SEPARATED on face2 axis {j}: {abs(np.dot(t, axes2[j]))} > {ra+rb-epsilon}")
                 return False
         for i in range(3):
             for j in range(3):
-                ra = half_sizes1[(i + 1) % 3] * R_abs[(i + 2) % 3, j] + half_sizes1[(i + 2) % 3] * R_abs[(i + 1) % 3, j]
-                rb = half_sizes2[(j + 1) % 3] * R_abs[i, (j + 2) % 3] + half_sizes2[(j + 2) % 3] * R_abs[i, (j + 1) % 3]
-                if abs(t_local1[(i + 2) % 3] * R[(i + 1) % 3, j] - t_local1[(i + 1) % 3] * R[(i + 2) % 3, j]) > ra + rb - 2*epsilon:
+                ra = (half_sizes1[(i + 1) % 3] * R_abs[(i + 2) % 3, j]
+                    + half_sizes1[(i + 2) % 3] * R_abs[(i + 1) % 3, j])
+                rb = (half_sizes2[(j + 1) % 3] * R_abs[i, (j + 2) % 3]
+                    + half_sizes2[(j + 2) % 3] * R_abs[i, (j + 1) % 3])
+                proj = abs(t_local1[(i + 2) % 3] * R[(i + 1) % 3, j]
+                        - t_local1[(i + 1) % 3] * R[(i + 2) % 3, j])
+                if proj > ra + rb + epsilon:   # note: + epsilon, and compare to a real separation
+                    # print(f"SEPARATED on cross axis {i},{j}: {proj} > {ra+rb+epsilon}")
                     return False
         return True
 
@@ -262,14 +270,20 @@ class Chiplet_Configuration_Design():
         new_point_orients = []
         for ind, comp in enumerate(types):
             if pointing[ind]:
+                L = 1.0  # desired keep-out rod length in meters (make this a parameter)
+
                 comp_point_dir = np.matmul(orientations[ind], point_dir)
+                # face center: component center + half-dimension along pointing dir
                 point_loc = np.array(locations[ind]) + np.multiply(np.array(dimensions[ind]) / 2, comp_point_dir)
-                point_dim_main = np.multiply(comp_point_dir - point_loc, comp_point_dir)
-                point_dim_off = np.abs(np.matmul(orientations[ind], np.array([0, 0.01, 0.01])))
-                point_dims = point_dim_main + point_dim_off
-                point_loc_center = point_loc + np.multiply(point_dim_main / 2, comp_point_dir)
-                new_point_locs.append(point_loc_center)
+
+                # rod length lives in the component's local x (pointing) axis; thin in y,z
+                point_dims = np.array([L, 0.01, 0.01])
+
+                # center the rod a half-length out from the face along the pointing dir
+                point_loc_center = point_loc + np.multiply(L / 2, comp_point_dir)
+
                 new_point_dims.append(point_dims)
+                new_point_locs.append(point_loc_center)
                 new_point_orients.append(orientations[ind])
         return new_point_locs, new_point_dims, new_point_orients
 
@@ -582,7 +596,6 @@ class Chiplet_Configuration_Design():
         for comp in self.component_list:
             locations.append(comp.location)
             orientations.append(comp.orientation)
-            # dimensions.append(np.matmul(np.abs(comp.orientation), comp.dimensions))
             dimensions.append(comp.dimensions)
             types.append(comp.type)
             masses.append(comp.mass)
