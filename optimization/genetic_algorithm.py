@@ -119,12 +119,28 @@ def run_genetic_algorithm(max_obj, params, eval_function):
         oracle_info.append(any_gain)
         child[:] = best
 
+    def mutate_structure(child):
+        # component mutation never touches genes 0-4, so the population can lose structure diversity
+        g = rng.integers(5)
+        var = des_space[g]
+        if var['type'] == 'continuous':
+            child[g] = rng.uniform(*var['range'])
+        else:
+            child[g] = rng.choice(var['range'])
+
     def component_mutation(offspring, ga_instance):
         for child in offspring:
+            if rng.random() < params.get('ga_immigrant_rate', 0.0):
+                x = construct_feasible(eval_function, rng)
+                if x is not None:
+                    child[:] = x
+                    continue
             if oracle:
                 oracle_move(child)
             else:
                 mutate_components(child)
+            if rng.random() < params.get('ga_structure_mutation_rate', 0.0):
+                mutate_structure(child)
         return offspring
 
     actor = None

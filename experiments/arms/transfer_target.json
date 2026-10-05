@@ -1,0 +1,48 @@
+[
+ {
+  "name": "m2_construct",
+  "method": "ga",
+  "set": {
+   "ga_mutation": "component",
+   "ga_keep_elitism": 8,
+   "ga_repair": true,
+   "ga_init": "construct",
+   "manifest_seed": 2
+  }
+ },
+ {
+  "name": "m2_from_m1",
+  "method": "ga",
+  "set": {
+   "ga_mutation": "component",
+   "ga_keep_elitism": 8,
+   "ga_repair": true,
+   "ga_init": "file",
+   "manifest_seed": 2,
+   "ga_init_path": "results/runs/transSrc/src_m1_s{seed}/population.npy"
+  }
+ },
+ {
+  "name": "m3_construct",
+  "method": "ga",
+  "set": {
+   "ga_mutation": "component",
+   "ga_keep_elitism": 8,
+   "ga_repair": true,
+   "ga_init": "construct",
+   "manifest_seed": 3
+  }
+ },
+ {
+  "name": "m3_from_m1",
+  "method": "ga",
+  "set": {
+   "ga_mutation": "component",
+   "ga_keep_elitism": 8,
+   "ga_repair": true,
+   "ga_init": "file",
+   "manifest_seed": 3,
+   "ga_init_path": "results/runs/transSrc/src_m1_s{seed}/population.npy"
+  }
+ }
+]
