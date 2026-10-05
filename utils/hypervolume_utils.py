@@ -64,16 +64,11 @@ class HypervolumeGrid:
         pointIdx = int(np.dot(gridPoint,self.mult))
 
         if not self.dominated[pointIdx]:
-            dominatedInd = np.arange(self.numPoints,dtype=int)
-            newDominated = np.ones(self.numPoints, dtype=bool)
-            for dim in range(len(self.refPoint)):
-                dimList = np.floor_divide(np.mod(dominatedInd,self.mult[dim]*self.gridSize,dtype=int),self.mult[dim],dtype=int)
-                fitDim = dimList <= gridPoint[dim]
-                newDominated = np.logical_and(newDominated,fitDim, dtype=bool)
-            
             self.updateParetoFront(point,solution)
 
-            self.dominated = np.logical_or(self.dominated, newDominated, dtype=bool)
+            # mark every cell with all coordinates <= gridPoint (same as the old per-cell loop)
+            grid = self.dominated.reshape((self.gridSize,) * len(self.refPoint))
+            grid[tuple(slice(0, max(int(g) + 1, 0)) for g in gridPoint)] = True
 
     def updateParetoFront(self,newPoint,solution):
         """

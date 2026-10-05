@@ -4,6 +4,9 @@ experiments/data/<tag>_shard_<k>.jsonl. Finished job ids are skipped, so it can 
 stopped and restarted.
 
     python experiments/runner.py --tag test --methods ga,ppo --seeds 0-7 --budget 64000 --ref experiments/reference/provisional.npy
+
+--arms takes a JSON file instead of --methods, to run the same method with different params:
+    [{"name": "ga_repair", "method": "ga", "set": {"ga_repair": true}}, ...]
 """
 import argparse
 import datetime
@@ -25,7 +28,7 @@ import torch
 
 from utils.component_list import getComponents
 from utils.component_classes import StructPanel
-from utils.evaluation import Chiplet_Configuration_Design
+from utils.fast_evaluation import FastChipletDesign
 
 
 def _methods():
@@ -118,9 +121,11 @@ def run_job(job, args, overrides, max_values):
 
     params = dict(BASE_PARAMS)
     params.update(overrides)
+    params.update(job.get('set', {}))
     params['num_epochs'] = max(1, args.budget // params['mini_batch_size'])
     params['seed'] = job['seed']
-    params['date_str'] = f"runs/{args.tag}/{job['method']}_s{job['seed']}"
+    params['nfe_budget'] = args.budget  # used by the GA
+    params['date_str'] = f"runs/{args.tag}/{job['arm']}_s{job['seed']}"
     work = os.path.join('results', params['date_str'])
     os.makedirs(work, exist_ok=True)
     params['save_path'] = work + '/'
@@ -133,7 +138,16 @@ def run_job(job, args, overrides, max_values):
         params['model_folder'] = args.actors
 
     components, _ = getComponents()
-    eval_function = Chiplet_Configuration_Design(components, StructPanel())
+    # same results as Chiplet_Configuration_Design, faster overlap checks
+    eval_function = FastChipletDesign(components, StructPanel())
+    violated = []
+    evaluate = eval_function.evaluate
+
+    def counting_evaluate(x):
+        out = evaluate(x)
+        violated.append(bool(out[1]))
+        return out
+    eval_function.evaluate = counting_evaluate
 
     t0 = time.time()
     out = fn(max_values, params, eval_function) if needs_ref else fn(params, eval_function)
@@ -146,6 +160,8 @@ def run_job(job, args, overrides, max_values):
         'final_hv': float(hypervolumes[-1]) if hypervolumes else 0.0,
         'nfe': int(out[5]),
         'front_size': int(len(front)),
+        'n_feasible': int(len(violated) - sum(violated)),
+        'first_feasible_nfe': next((k + 1 for k, v in enumerate(violated) if not v), None),
         'hv_curve': checkpoints(hypervolumes),
         'wall_s': round(wall, 1),
         'params': {k: v for k, v in params.items() if k not in ('date_str', 'save_path')},
@@ -155,7 +171,8 @@ def run_job(job, args, overrides, max_values):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--tag', required=True, help='experiment name; prefixes job ids and output files')
-    ap.add_argument('--methods', required=True, help='comma list of: ' + ', '.join(_methods()))
+    ap.add_argument('--methods', help='comma list of: ' + ', '.join(_methods()))
+    ap.add_argument('--arms', help='JSON file of {name, method, set} arms, instead of --methods')
     ap.add_argument('--seeds', default='0-7', help='e.g. 0-7 or 0,3,5')
     ap.add_argument('--budget', type=int, default=64000, help='target evaluations per run')
     ap.add_argument('--ref', help='max_values .npy shared by every job (required for all but random)')
@@ -165,7 +182,14 @@ def main():
     ap.add_argument('--nshards', type=int, default=1)
     args = ap.parse_args()
 
-    methods = args.methods.split(',')
+    if args.arms:
+        with open(args.arms) as f:
+            arms = json.load(f)
+    elif args.methods:
+        arms = [{'name': m, 'method': m} for m in args.methods.split(',')]
+    else:
+        ap.error('give --methods or --arms')
+    methods = [a['method'] for a in arms]
     unknown = [m for m in methods if m not in _methods()]
     if unknown:
         ap.error(f'unknown method(s) {unknown}; choose from {list(_methods())}')
@@ -174,8 +198,9 @@ def main():
     max_values = np.load(args.ref) if args.ref else None
     overrides = parse_overrides(args.set)
 
-    jobs = [{'job_id': f'{args.tag}:{m}:{s}', 'method': m, 'seed': s}
-            for m in methods for s in parse_seeds(args.seeds)]
+    jobs = [{'job_id': f"{args.tag}:{a['name']}:{s}", 'arm': a['name'], 'method': a['method'],
+             'set': a.get('set', {}), 'seed': s}
+            for a in arms for s in parse_seeds(args.seeds)]
     mine = [j for i, j in enumerate(jobs) if i % args.nshards == args.shard]
 
     out_path = os.path.join(ROOT, 'experiments', 'data', f'{args.tag}_shard_{args.shard}.jsonl')

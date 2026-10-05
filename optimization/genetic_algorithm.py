@@ -2,6 +2,7 @@ import numpy as np
 import pygad
 
 from utils.hypervolume_utils import HypervolumeGrid
+from utils.construct import construct_feasible, repair_overlaps, valid_panels
 
 
 def run_genetic_algorithm(max_obj, params, eval_function):
@@ -47,9 +48,15 @@ def run_genetic_algorithm(max_obj, params, eval_function):
         return solution
 
     # Define the fitness function for the genetic algorithm
+    rng = np.random.default_rng(params.get('seed'))
+    nfe_budget = params.get('nfe_budget')
+
     def fitness_func(ga_instance, solution, solution_idx):
         # print(f"Evaluating solution {solution}")
         solution = repair_invalid_panels(solution)
+        if params.get('ga_repair', False):
+            # re-place overlapping components; written back so the population keeps it
+            solution[:] = repair_overlaps(eval_function, solution, rng)
         objectives, constraints, constraint_vals = eval_function.evaluate(solution)
         # print(f"Objectives: {objectives}")
         nonlocal all_des, all_obj, all_constraints, NFE, all_constraint_vals
@@ -68,18 +75,53 @@ def run_genetic_algorithm(max_obj, params, eval_function):
     def on_generation(ga_instance):
         if ga_instance.generations_completed % 10 == 0:
             print(f"Generation {ga_instance.generations_completed}")
+        if nfe_budget is not None and NFE >= nfe_budget:
+            return "stop"
+
+    def component_mutation(offspring, ga_instance):
+        # re-sample all 5 genes of a few components instead of single genes
+        n_comp = eval_function.num_components
+        k = params.get('ga_components_per_mutation', 1)
+        for child in offspring:
+            for i in rng.choice(n_comp, size=k, replace=False):
+                child[5+5*i] = rng.choice(valid_panels(eval_function, child, i))
+                child[6+5*i] = des_space[6]['range'][rng.integers(101)]
+                child[7+5*i] = des_space[7]['range'][rng.integers(101)]
+                child[8+5*i] = rng.integers(6)
+                child[9+5*i] = des_space[9]['range'][rng.integers(36)]
+        return offspring
+
+    ga_kwargs = {}
+    if params.get('ga_init') == 'construct':
+        init = []
+        while len(init) < pop_size:
+            x = construct_feasible(eval_function, rng)
+            if x is not None:
+                init.append(x)
+        ga_kwargs['initial_population'] = np.array(init, dtype=float)
+    if params.get('ga_mutation') == 'component':
+        ga_kwargs['mutation_type'] = component_mutation
+    else:
+        ga_kwargs['mutation_type'] = 'random'
+        if params.get('ga_mutation_num_genes') is not None:
+            ga_kwargs['mutation_num_genes'] = params['ga_mutation_num_genes']
+        else:
+            ga_kwargs['mutation_probability'] = params.get('ga_mutation_probability', 0.1)
+    if params.get('ga_keep_elitism') is not None:
+        ga_kwargs['keep_elitism'] = params['ga_keep_elitism']
+    if params.get('seed') is not None:
+        ga_kwargs['random_seed'] = params['seed']
 
     # Create the GA instance
-    ga_instance = pygad.GA(num_generations=n_gen,
+    ga_instance = pygad.GA(num_generations=n_gen if nfe_budget is None else 10**6,
                            num_parents_mating=int(pop_size/4),
                            fitness_func=fitness_func,
                            sol_per_pop=pop_size,
                            num_genes=len(des_space),
                            gene_space=gene_space,
-                           parent_selection_type="nsga2",
+                           parent_selection_type=params.get('ga_parent_selection', "nsga2"),
                            on_generation=on_generation,
-                           mutation_type="random",
-                           mutation_probability=0.1)
+                           **ga_kwargs)
 
     # Run the GA
     ga_instance.run()

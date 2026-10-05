@@ -10,9 +10,13 @@ from collections import deque
 
 class Chiplet_Configuration_Design():
 
-    def __init__(self, component_list, structure_panel):
+    def __init__(self, component_list, structure_panel, fix_face_offsets=False):
         
         self.problem_name = 'Chiplet_Configuration'
+        # The pointing rods and wire ports were offset by dims * world direction, which uses the
+        # wrong dimension unless the component's x axis is along world x. True offsets by the
+        # component's own x half-length instead.
+        self.fix_face_offsets = fix_face_offsets
         self.num_objectives = 5
         self.num_constraints = 3
 
@@ -180,17 +184,24 @@ class Chiplet_Configuration_Design():
         return True
 
 
+    def face_offset(self, dims, direction):
+        # center of the component's local +/-x face relative to its center
+        if self.fix_face_offsets:
+            return dims[0] / 2 * np.asarray(direction)
+        return np.multiply(np.array(dims) / 2, direction)
+
+
     def wire_cost(self, dimensions, locations, types, orientations):
         
         port_dir_base = np.array([-1, 0, 0])
         PCUInd = types.index("PCU")
         PCULoc = locations[PCUInd]
         PCUPortDir = np.matmul(orientations[PCUInd], port_dir_base)
-        PCUPortLoc = np.array(PCULoc) + np.multiply(np.array(dimensions[PCUInd]) / 2, PCUPortDir)
+        PCUPortLoc = np.array(PCULoc) + self.face_offset(dimensions[PCUInd], PCUPortDir)
         tot_wire_len = 0
         for ind, loc in enumerate(locations):
             port_dir = np.matmul(orientations[ind], port_dir_base)
-            comp_port_loc = np.array(loc) + np.multiply(np.array(dimensions[ind]) / 2, port_dir)
+            comp_port_loc = np.array(loc) + self.face_offset(dimensions[ind], port_dir)
             wire_len = np.abs(PCUPortLoc[0] - comp_port_loc[0]) + np.abs(PCUPortLoc[1] - comp_port_loc[1]) + np.abs(PCUPortLoc[2] - comp_port_loc[2])
             tot_wire_len += wire_len
         return tot_wire_len
@@ -274,7 +285,7 @@ class Chiplet_Configuration_Design():
 
                 comp_point_dir = np.matmul(orientations[ind], point_dir)
                 # face center: component center + half-dimension along pointing dir
-                point_loc = np.array(locations[ind]) + np.multiply(np.array(dimensions[ind]) / 2, comp_point_dir)
+                point_loc = np.array(locations[ind]) + self.face_offset(dimensions[ind], comp_point_dir)
 
                 # rod length lives in the component's local x (pointing) axis; thin in y,z
                 point_dims = np.array([L, 0.01, 0.01])
@@ -517,6 +528,10 @@ class Chiplet_Configuration_Design():
 
         # place components
         for i in range(len(self.component_list)):
+            self.place_component(i, x)
+
+
+    def place_component(self, i, x):
             compPanel = x[5*i+5]
             compLoc = [x[5*i+6],x[5*i+7]]
             compFace = x[5*i+8]
