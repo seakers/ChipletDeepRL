@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 from utils.hypervolume_utils import HypervolumeGrid
 from optimization.transformer_architecture_informed_state import Actor, Critic
 from utils.ppo_utils import is_legacy
+from utils.construct import repair_overlaps
 
 
 def run_ppo_optimization_informed_state(max_objectives, params, eval_function, run_idx=0, best_hv_so_far=-np.inf):
@@ -43,13 +44,15 @@ def run_ppo_optimization_informed_state(max_objectives, params, eval_function, r
     all_avg_obj = []
     all_kl = []
     hv_grid = HypervolumeGrid(refPoint=[1.0]*num_objectives)
+    # params['ppo_repair'] re-places overlapping components before evaluating (no extra NFE)
+    rng = np.random.default_rng(params.get('seed')) if params.get('ppo_repair', False) else None
 
     for epoch in range(epochs):
         if epoch % 10 == 9:
             print(f"Epoch {epoch + 1}/{epochs}")
         actor, critic, NFE, all_des, all_obj, all_constraints, all_constraint_vals, avg_obj, critic_loss, actor_loss, kl = run_epoch(
             actor, critic, num_actions, NFE, max_objectives,
-            all_des, all_obj, all_constraints, all_constraint_vals, device, params, eval_function
+            all_des, all_obj, all_constraints, all_constraint_vals, device, params, eval_function, rng
         )
         all_actor_loss.append(actor_loss)
         all_critic_loss.append(critic_loss)
@@ -167,7 +170,7 @@ def discounted_cumulative_sums(x, discount):
     return scipy.signal.lfilter([1], [1, float(-discount)], x[::-1], axis=0)[::-1]
 
 
-def run_epoch(actor, critic, num_actions, NFE, max_obj, all_des, all_obj, all_constraints, all_constraint_vals, device, params, eval_function):
+def run_epoch(actor, critic, num_actions, NFE, max_obj, all_des, all_obj, all_constraints, all_constraint_vals, device, params, eval_function, rng=None):
 
     mini_batch_size = params['mini_batch_size']
     num_objs = len(max_obj)
@@ -211,6 +214,8 @@ def run_epoch(actor, critic, num_actions, NFE, max_obj, all_des, all_obj, all_co
     # get objective values
     objectives = []
     for idx, des in enumerate(designs):
+        if rng is not None:
+            des = repair_overlaps(eval_function, des, rng)
         obj_values, constraints, constraint_vals = eval_function.evaluate(des)
         NFE += 1
         all_des.append(des)
