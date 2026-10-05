@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 
 from utils.hypervolume_utils import HypervolumeGrid
 from optimization.transformer_architecture_informed_state import Actor, Critic
-from utils.ppo_utils import is_legacy, throttle
+from utils.ppo_utils import is_legacy
 
 
 def run_ppo_optimization_informed_state(max_objectives, params, eval_function, run_idx=0, best_hv_so_far=-np.inf):
@@ -45,7 +45,6 @@ def run_ppo_optimization_informed_state(max_objectives, params, eval_function, r
     hv_grid = HypervolumeGrid(refPoint=[1.0]*num_objectives)
 
     for epoch in range(epochs):
-        t_epoch = time.time()
         if epoch % 10 == 9:
             print(f"Epoch {epoch + 1}/{epochs}")
         actor, critic, NFE, all_des, all_obj, all_constraints, all_constraint_vals, avg_obj, critic_loss, actor_loss, kl = run_epoch(
@@ -56,7 +55,6 @@ def run_ppo_optimization_informed_state(max_objectives, params, eval_function, r
         all_critic_loss.append(critic_loss)
         all_avg_obj.append(avg_obj)
         all_kl.append(kl)
-        throttle(params, t_epoch)
 
     all_des = np.array(all_des)
     all_obj = np.array(all_obj)

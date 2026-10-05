@@ -8,7 +8,7 @@ from copy import deepcopy
 
 from utils.hypervolume_utils import is_pareto_efficient
 from optimization.transformer_design_repair import Actor, Critic
-from utils.ppo_utils import is_legacy, throttle
+from utils.ppo_utils import is_legacy
 
 
 def discounted_cumulative_sums(x, discount):
@@ -50,7 +50,6 @@ def run_design_repair(max_values, params, eval_function, run_idx=0, best_hv_so_f
     all_actor_loss, all_critic_loss, all_avg_reward, all_kl = [], [], [], []
       
     while NFE < epochs * mini_batch_size:
-        t_epoch = time.time()
         # epoch = NFE // mini_batch_size
         # if epoch % 10 == 9:
             # print(f"Epoch {epoch + 1}/{epochs}, NFE: {NFE}")
@@ -98,7 +97,6 @@ def run_design_repair(max_values, params, eval_function, run_idx=0, best_hv_so_f
         all_critic_loss.append(stats['critic_loss'])
         all_avg_reward.append(stats['avg_reward'])
         all_kl.append(stats['kl'])
-        throttle(params, t_epoch)
     
     # Post-process results
     all_des = np.array(all_des)
