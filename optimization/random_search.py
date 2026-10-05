@@ -18,7 +18,7 @@ def run_random_search(params, eval_function):
     NFE = 0
     hv_grid = HypervolumeGrid(refPoint=[1.0]*num_objectives)
 
-    rng = np.random.default_rng()
+    rng = np.random.default_rng(params.get('seed'))
 
     for run in range(num_exec):
         if run % (params['mini_batch_size']*10) == 0:

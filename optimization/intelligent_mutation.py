@@ -4,6 +4,8 @@ import torch
 
 from utils.hypervolume_utils import HypervolumeGrid
 from optimization.transformer_design_repair import Actor
+from optimization.design_repair import encode_design, decode_action_to_value
+from utils.ppo_utils import is_legacy
 
 def run_intelligent_mutation_ga(max_obj, params, eval_function):
     """
@@ -98,7 +100,7 @@ def run_intelligent_mutation_ga(max_obj, params, eval_function):
                 # Create new design by modifying selected variable
                 new_design = design.copy()
                 new_design[var_idx.item()] = decode_action_to_value(
-                    int(value_idx.item()), int(var_idx.item()), des_space
+                    value_idx.item(), int(var_idx.item()), des_space, is_legacy(params)
                 )
                 design = new_design.copy()
                         
@@ -181,33 +183,3 @@ def get_models(device, params, num_objectives, num_actions, unique_des_space, co
         print("Loaded pre-trained models.")
 
     return actor
-
-
-def encode_design(design, des_space):
-    """
-    Encode design values to normalized representation.
-    Handles both continuous and discrete variables.
-    """
-    encoded = []
-    for i, val in enumerate(design):
-        if des_space[i]['type'] == 'continuous':
-            # Normalize to [0, 1]
-            range_min, range_max = des_space[i]['range']
-            encoded.append((val - range_min) / (range_max - range_min))
-        elif des_space[i]['type'] == 'discrete':
-            # Normalize discrete index
-            encoded.append(des_space[i]['range'].index(val) / (len(des_space[i]['range']) - 1))
-    return encoded
-
-
-def decode_action_to_value(action_idx, var_idx, des_space):
-    """
-    Decode action index to actual design value.
-    """
-    if des_space[var_idx]['type'] == 'continuous':
-        # Map action index to continuous value (assuming discretized actions)
-        range_min, range_max = des_space[var_idx]['range']
-        num_bins = des_space[var_idx].get('num_bins', 10)
-        return range_min + (action_idx / num_bins) * (range_max - range_min)
-    elif des_space[var_idx]['type'] == 'discrete':
-        return des_space[var_idx]['range'][action_idx]

@@ -5,6 +5,8 @@ from torch import autocast
 from torch.cuda.amp import GradScaler
 import math
 
+from utils.ppo_utils import is_legacy, amp_settings, amp_ctx, add_positional_encoding, unique_var_index
+
 
 class PositionalEncoding(nn.Module):
     """Positional encoding for transformer - same as truss version [5]"""
@@ -99,21 +101,26 @@ class Actor(nn.Module):
         self.nhead = 2
         self.num_layers = 2
         self.clip_ratio = params['clip_ratio']
-        self.scaler = GradScaler()
+        self.legacy = is_legacy(params)
+        self.use_amp, dropout = amp_settings(params)
+        self.scaler = GradScaler(enabled=self.use_amp)
+        # des_space is the unique space (10 vars), but the pointer needs every design variable
+        self.num_design_vars = 5 + 5 * len(comp_list)
+        self.num_pointer_targets = self.num_variables if self.legacy else self.num_design_vars
         
         # Input dimension: design variables + objectives
         self.input_dim = self.num_variables + num_objectives
         
         # Encode input design
         self.design_encoder = nn.Linear(1, self.dense_dim)
-        self.positional_encoding = PositionalEncoding(self.dense_dim)
+        self.positional_encoding = PositionalEncoding(self.dense_dim, dropout=dropout)
         
         # Transformer encoder to process design
         encoder_layer = nn.TransformerEncoderLayer(
             d_model=self.dense_dim,
             nhead=self.nhead,
             dim_feedforward=self.dense_dim * 4,
-            dropout=0.1,
+            dropout=dropout,
             batch_first=True
         )
         self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=self.num_layers)
@@ -154,6 +161,12 @@ class Actor(nn.Module):
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=1000, gamma=0.9)
     
     
+    def _unique_idx(self, var_idx):
+        # index into the unique design space for a full design variable
+        if self.legacy:
+            return var_idx % len(self.des_space) if var_idx >= len(self.des_space) else var_idx
+        return unique_var_index(var_idx, len(self.des_space))
+
     def forward(self, design_state, var_idx=None):
         """
         design_state: [batch, num_variables + num_objectives] or [num_variables + num_objectives]
@@ -162,7 +175,7 @@ class Actor(nn.Module):
         if design_state.dim() == 1:
             design_state = design_state.unsqueeze(0)
             
-        with autocast(device_type=self.device.type, dtype=torch.float16):
+        with amp_ctx(self):
             batch_size = design_state.size(0)
             
             # Encode each element of the design separately
@@ -175,7 +188,7 @@ class Actor(nn.Module):
             # Pointer network: which variable to modify?
             context = encoded.mean(dim=1, keepdim=True)  # [batch, 1, dense_dim]
             query = self.pointer_query(context)  # [batch, 1, dense_dim]
-            keys = self.pointer_key(encoded[:, :self.num_variables, :])  # Only point to design variables, not objectives
+            keys = self.pointer_key(encoded[:, :self.num_pointer_targets, :])  # Only point to design variables, not objectives
             
             # Attention scores for variable selection
             pointer_logits = torch.matmul(query, keys.transpose(1, 2)).squeeze(1)  # [batch, num_variables]
@@ -237,7 +250,7 @@ class Actor(nn.Module):
         """
         batch_size = encoded.size(0)
 
-        with autocast(device_type=self.device.type, dtype=torch.float16):
+        with amp_ctx(self):
             # Gather the encoded representation of selected variables
             var_indices_expanded = var_indices.unsqueeze(-1).unsqueeze(-1).expand(-1, -1, self.dense_dim)
             selected_var_encoding = torch.gather(encoded, 1, var_indices_expanded).squeeze(1)  # [batch, dense_dim]
@@ -257,7 +270,7 @@ class Actor(nn.Module):
                 var_idx = var_indices[i].item()
 
                 # Map to unique design space index (handle repeated components)
-                unique_idx = var_idx % len(self.des_space) if var_idx >= len(self.des_space) else var_idx
+                unique_idx = self._unique_idx(var_idx)
 
                 value_output = self.value_predictors[unique_idx](combined[i:i+1])
                 all_value_outputs.append(value_output)
@@ -291,7 +304,7 @@ class Actor(nn.Module):
 
         for i, (value_output, var_type) in enumerate(zip(value_outputs, var_types)):
             var_idx = var_indices[i].item()
-            unique_idx = var_idx % len(self.des_space) if var_idx >= len(self.des_space) else var_idx
+            unique_idx = self._unique_idx(var_idx)
 
             if var_type == 'continuous':
                 # FIX: Convert to float32 before Beta distribution
@@ -342,7 +355,7 @@ class Actor(nn.Module):
         """
         self.optimizer.zero_grad()
 
-        with autocast(device_type=self.device.type, dtype=torch.float16):
+        with amp_ctx(self):
             policy_losses = []
             all_kls = []
 
@@ -367,7 +380,7 @@ class Actor(nn.Module):
 
                 for t in range(observation.size(0)):
                     var_idx = action[t, 0].long().item()
-                    unique_idx = var_idx % len(self.des_space) if var_idx >= len(self.des_space) else var_idx
+                    unique_idx = self._unique_idx(var_idx)
                     var_type = self.des_space[unique_idx]['type']
 
                     # Get value prediction for this timestep
@@ -453,17 +466,19 @@ class Critic(nn.Module):
         self.input_dim = input_dim
 
         self.dense_dim = 16  # Match [3]
-        self.scaler = GradScaler()
+        self.legacy = is_legacy(params)
+        self.use_amp, dropout = amp_settings(params)
+        self.scaler = GradScaler(enabled=self.use_amp)
         self.clip_ratio = params['clip_ratio']
 
         # Transformer layers - same structure as informed_state critic [3]
         self.encoder = nn.Linear(1, self.dense_dim)
-        self.positional_encoding = PositionalEncoding(self.dense_dim)
+        self.positional_encoding = PositionalEncoding(self.dense_dim, dropout=dropout)
         self.transformer_decoder = CustomTransformerDecoder(
             d_model=self.dense_dim,
             num_layers=1,
             dim_feedforward=self.dense_dim,
-            dropout=0.1
+            dropout=dropout
         )
         self.output_layer = nn.Linear(self.dense_dim, self.num_objectives)
 
@@ -481,10 +496,10 @@ class Critic(nn.Module):
         x: [batch, seq_len] - encoded design state
         Returns: [batch, num_objectives] - value estimate per objective
         """
-        with autocast(device_type=self.device.type, dtype=torch.float16):
+        with amp_ctx(self):
             x = x.unsqueeze(-1)                    # [batch, seq_len, 1]
             x = self.encoder(x)                     # [batch, seq_len, dense_dim]
-            x = self.positional_encoding(x)         # [batch, seq_len, dense_dim]
+            x = add_positional_encoding(self.positional_encoding, x, self.legacy)  # [batch, seq_len, dense_dim]
             mask = self.generate_square_subsequent_mask(x.size(1)).to(self.device)
             x = self.transformer_decoder(x, tgt_mask=mask)  # [batch, seq_len, dense_dim]
             x = self.output_layer(x)                # [batch, seq_len, num_objectives]
@@ -535,7 +550,7 @@ class Critic(nn.Module):
         self.optimizer.zero_grad()
         value_losses = []
 
-        with autocast(device_type=self.device.type, dtype=torch.float16):
+        with amp_ctx(self):
             for idx in range(len(design_states)):
                 if design_states[idx].size(0) == 0:
                     continue

@@ -7,6 +7,7 @@ from copy import deepcopy
 
 from utils.hypervolume_utils import is_pareto_efficient
 from optimization.transformer_design_repair import Actor, Critic
+from utils.ppo_utils import is_legacy
 
 
 def discounted_cumulative_sums(x, discount):
@@ -179,6 +180,7 @@ def run_repair_epoch(actor, critic, all_des, all_obj, all_constraints, all_const
     """
     num_objectives = len(max_objectives)
     num_actions = len(des_space)
+    legacy = is_legacy(params)
     
     # Storage for trajectories
     batch_observations = [[] for _ in range(mini_batch_size)]
@@ -215,7 +217,7 @@ def run_repair_epoch(actor, critic, all_des, all_obj, all_constraints, all_const
             # Create new design by modifying selected variable
             new_design = current_design.copy()
             new_design[var_idx.item()] = decode_action_to_value(
-                int(value_idx.item()), int(var_idx.item()), des_space
+                value_idx.item(), int(var_idx.item()), des_space, legacy
             )
 
             new_design = repair_invalid_panels(new_design, eval_function)  # Repair step to ensure valid panel choices
@@ -251,10 +253,10 @@ def run_repair_epoch(actor, critic, all_des, all_obj, all_constraints, all_const
             batch_rewards[idx].append(reward)
             batch_designs[idx].append(new_design)
             
-            new_obs = encode_design(new_design, des_space)
+            # store the state the action was taken in (legacy stored the next state)
+            batch_observations[idx].append(encode_design(new_design, des_space) if legacy else obs)
             current_design = new_design
             current_obj = new_obj
-            batch_observations[idx].append(new_obs)
                     
             # Check if stop decision was made
             if stop_decision.item() == 1:
@@ -364,17 +366,18 @@ def encode_design(design, des_space):
     return encoded
 
 
-def decode_action_to_value(action_idx, var_idx, des_space):
+def decode_action_to_value(action_value, var_idx, des_space, legacy=False):
     """
-    Decode action index to actual design value.
+    Decode a sampled action to a design value. Continuous actions are Beta samples in (0, 1).
     """
     if des_space[var_idx]['type'] == 'continuous':
-        # Map action index to continuous value (assuming discretized actions)
         range_min, range_max = des_space[var_idx]['range']
-        num_bins = des_space[var_idx].get('num_bins', 10)
-        return range_min + (action_idx / num_bins) * (range_max - range_min)
+        if legacy:
+            num_bins = des_space[var_idx].get('num_bins', 10)
+            return range_min + (int(action_value) / num_bins) * (range_max - range_min)
+        return range_min + float(action_value) * (range_max - range_min)
     elif des_space[var_idx]['type'] == 'discrete':
-        return des_space[var_idx]['range'][action_idx]
+        return des_space[var_idx]['range'][int(action_value)]
 
 
 def calculate_step_reward_spacecraft(parent_obj, child_obj, is_constrained, new_constraint_vals,

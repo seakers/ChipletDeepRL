@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 
 from utils.hypervolume_utils import HypervolumeGrid
 from optimization.transformer_architecture_informed_state import Actor, Critic
+from utils.ppo_utils import is_legacy
 
 
 def run_ppo_optimization_informed_state(max_objectives, params, eval_function, run_idx=0, best_hv_so_far=-np.inf):
@@ -247,6 +248,7 @@ def run_epoch(actor, critic, num_actions, NFE, max_obj, all_des, all_obj, all_co
     # calculate advantages
     gamma = params['gamma']
     lam = params['lambda']
+    legacy = is_legacy(params)
     all_advantages = [[] for x in range(mini_batch_size)]
     all_returns = [[] for x in range(mini_batch_size)]
     for idx in range(mini_batch_size):
@@ -256,7 +258,7 @@ def run_epoch(actor, critic, num_actions, NFE, max_obj, all_des, all_obj, all_co
         adv_tensor = discounted_cumulative_sums(deltas, gamma * lam)
         all_advantages[idx] = adv_tensor
 
-        ret_tensor = discounted_cumulative_sums(d_reward, gamma * lam)
+        ret_tensor = discounted_cumulative_sums(d_reward, gamma * lam if legacy else gamma)
         ret_tensor = np.array(ret_tensor, dtype=np.float32)
         all_returns[idx] = ret_tensor
 
@@ -272,6 +274,8 @@ def run_epoch(actor, critic, num_actions, NFE, max_obj, all_des, all_obj, all_co
     advantage_tensor = []
     return_tensor = []
     weights_tensor = []
+    action_pos_tensor = []
+    critic_pos_tensor = []
     for batch_element_idx in range(mini_batch_size):
         obs = observation[batch_element_idx]
         # obs now contains [weights..., action1, action2, ...]
@@ -290,6 +294,9 @@ def run_epoch(actor, critic, num_actions, NFE, max_obj, all_des, all_obj, all_co
             advantage_tensor.append(all_advantages[batch_element_idx][idx])
             return_tensor.append(all_returns[batch_element_idx][idx])
             weights_tensor.append(weights[batch_element_idx])
+            # positions read during the rollout: actor at the token before the action, critic at the action
+            action_pos_tensor.append(len(weights_part) - 1 + idx)
+            critic_pos_tensor.append(len(weights_part) + idx)
 
     observation_tensor = torch.tensor(observation_tensor, dtype=torch.float32).to(device)
     action_tensor = torch.tensor(action_tensor, dtype=torch.float32).to(device)
@@ -297,6 +304,11 @@ def run_epoch(actor, critic, num_actions, NFE, max_obj, all_des, all_obj, all_co
     advantage_tensor = torch.tensor(advantage_tensor, dtype=torch.float32).to(device)
     return_tensor = torch.tensor(return_tensor, dtype=torch.float32).to(device)
     weights_tensor = torch.tensor(np.array(weights_tensor), dtype=torch.float32).to(device)
+    if legacy:
+        action_pos_tensor = critic_pos_tensor = None
+    else:
+        action_pos_tensor = torch.tensor(action_pos_tensor, dtype=torch.long, device=device)
+        critic_pos_tensor = torch.tensor(critic_pos_tensor, dtype=torch.long, device=device)
 
     targetkl = params['target_kl']
     actor_iterations = params['update_iterations']
@@ -305,7 +317,8 @@ def run_epoch(actor, critic, num_actions, NFE, max_obj, all_des, all_obj, all_co
             observation_tensor, 
             action_tensor, 
             logprob_tensor,
-            advantage_tensor
+            advantage_tensor,
+            action_pos_tensor
         )
         if kl > targetkl:
             # print("KL Divergence exceeded target, stopping actor update")
@@ -316,7 +329,8 @@ def run_epoch(actor, critic, num_actions, NFE, max_obj, all_des, all_obj, all_co
         critic_loss = critic.ppo_update(
             observation_tensor, 
             return_tensor, 
-            weights_tensor
+            weights_tensor,
+            critic_pos_tensor
         )
 
     avg_obj = np.mean(objectives, axis=0)

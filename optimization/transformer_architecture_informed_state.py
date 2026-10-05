@@ -7,6 +7,8 @@ from torch.cuda.amp import GradScaler
 import math
 from scipy.stats import norm
 
+from utils.ppo_utils import is_legacy, amp_settings, amp_ctx, add_positional_encoding, gather_positions
+
 
 
 class CustomDecoderLayer(nn.Module):
@@ -99,16 +101,18 @@ class Actor(nn.Module):
 
         self.nhead = 2
         self.dense_dim = 32
-        self.scaler = GradScaler()
+        self.legacy = is_legacy(params)
+        self.use_amp, dropout = amp_settings(params)
+        self.scaler = GradScaler(enabled=self.use_amp)
         self.clip_ratio = params['clip_ratio']
-        
+
         self.encoder = nn.Linear(1, self.dense_dim)
-        self.positional_encoding = PositionalEncoding(self.dense_dim)
+        self.positional_encoding = PositionalEncoding(self.dense_dim, dropout=dropout)
         self.transformer_decoder = CustomTransformerDecoder(
             d_model=self.dense_dim,
             num_layers=2,
             dim_feedforward=self.dense_dim,
-            dropout=0.1
+            dropout=dropout
         )
         # self.output_layer = nn.Linear(self.dense_dim, self.num_actions)
         self.output_layers = nn.ModuleList()
@@ -167,10 +171,10 @@ class Actor(nn.Module):
     
     def forward(self, x, ind):
 
-        with autocast(device_type=self.device.type, dtype=torch.float16):
+        with amp_ctx(self):
             x = x.unsqueeze(-1)
             x = self.encoder(x)
-            x = self.positional_encoding(x)
+            x = add_positional_encoding(self.positional_encoding, x, self.legacy)
             mask = self.generate_square_subsequent_mask(x.size(1)).to(self.device) # x.size(1) is the sequence length
             x = self.transformer_decoder(x, tgt_mask=mask)
             x = self.output_layers[ind](x)
@@ -213,15 +217,19 @@ class Actor(nn.Module):
                 dist = torch.distributions.categorical.Categorical(logits=log_probs)
             samples = dist.sample()
             action_ids = samples.squeeze()
-            action_probs = log_probs.gather(1, action_ids.unsqueeze(-1)).squeeze()
+            if self.legacy:
+                action_probs = log_probs.gather(1, action_ids.unsqueeze(-1)).squeeze()
+            else:
+                action_probs = dist.log_prob(samples).squeeze()
 
         return action_probs, action_ids
     
 
-    def ppo_update(self, observation, action, logprob, advantage):
+    def ppo_update(self, observation, action, logprob, advantage, action_pos=None):
+        # action_pos: position each action was sampled at (observations are zero padded)
 
         self.optimizer.zero_grad()
-        with autocast(device_type=self.device.type, dtype=torch.float16):
+        with amp_ctx(self):
             num_vars = observation.size(1) - self.num_objectives
             new_log_probs = torch.zeros_like(action, dtype=torch.float32).to(self.device)
             pointing_comps = torch.tensor(
@@ -232,6 +240,10 @@ class Actor(nn.Module):
             # Find the index of the first pointing and first nonpointing component
             first_pointing_idx = next((i for i, p in enumerate(pointing_comps) if p), None)
             first_nonpointing_idx = next((i for i, p in enumerate(pointing_comps) if not p), None)
+            if not self.legacy:
+                # get_valid_panel_mask expects a variable index, not a component index
+                first_pointing_idx = 5 * (first_pointing_idx + 1)
+                first_nonpointing_idx = 5 * (first_nonpointing_idx + 1)
             for i in range(len(self.des_space)):
                 var_mask = torch.zeros((observation.size(0)), dtype=torch.bool, device=self.device)
                 if i < 5:
@@ -241,15 +253,16 @@ class Actor(nn.Module):
                     var_mask[i-5::num_vars] = False
                 var_observation = observation[var_mask]
                 var_action = action[var_mask]
+                var_pos = None if action_pos is None else action_pos[var_mask]
                 # need to separate discrete and continuous to calculate logprobs
                 if self.des_space[i]['type'] == 'continuous':
-                    params = self.forward(var_observation, i)
-                    alpha = params[:,-1,0].squeeze()
-                    beta = params[:,-1,1].squeeze()
+                    params = gather_positions(self.forward(var_observation, i), var_pos)
+                    alpha = params[:,0].squeeze()
+                    beta = params[:,1].squeeze()
                     action_dist = torch.distributions.Beta(alpha, beta)
                     var_new_logprobs = action_dist.log_prob(var_action)
                 elif self.des_space[i]['type'] == 'discrete':
-                    pred_probs = self.forward(var_observation, i)[:,-1,:]
+                    pred_probs = gather_positions(self.forward(var_observation, i), var_pos)
                     log_probs = torch.log(pred_probs + 1e-10)
                     if i == 5 or (i > 5 and (i - 5) % 5 == 0):  # panel choice indices
                         # pointing and nonpointing components have different valid panel choices
@@ -259,6 +272,9 @@ class Actor(nn.Module):
                         valid_mask[pointing_comps] = valid_mask_pointing
                         valid_mask[~pointing_comps] = valid_mask_nonpointing
                         log_probs[~valid_mask] = -1e9
+                        if not self.legacy:
+                            # renormalize over valid panels like sample_action
+                            log_probs = F.log_softmax(log_probs, dim=-1)
                     var_new_logprobs = torch.sum(torch.mul(F.one_hot(var_action.long(), num_classes=len(self.des_space[i]['range'])), log_probs), dim=-1)
                 else:
                     print("INVALID DESIGN SPACE")
@@ -295,18 +311,20 @@ class Critic(nn.Module):
 
         self.nhead = 2
         self.dense_dim = 16
-        self.scaler = GradScaler()
+        self.legacy = is_legacy(params)
+        self.use_amp, dropout = amp_settings(params)
+        self.scaler = GradScaler(enabled=self.use_amp)
         self.clip_ratio = params['clip_ratio']
         self.num_objectives = num_objectives
 
         self.encoder = nn.Linear(1, self.dense_dim)
-        self.positional_encoding = PositionalEncoding(self.dense_dim)
+        self.positional_encoding = PositionalEncoding(self.dense_dim, dropout=dropout)
         self.transformer_decoder = CustomTransformerDecoder(
             d_model=self.dense_dim,
             # nhead=self.nhead,
             num_layers=1,
             dim_feedforward=self.dense_dim,
-            dropout=0.1
+            dropout=dropout
         )
         self.output_layer = nn.Linear(self.dense_dim, self.num_objectives)
 
@@ -322,16 +340,16 @@ class Critic(nn.Module):
         return mask
     
 
-    def forward(self, x):
+    def forward(self, x, pos=None):
 
-        with autocast(device_type=self.device.type, dtype=torch.float16):
+        with amp_ctx(self):
             x = x.unsqueeze(-1)
             x = self.encoder(x)
-            x = self.positional_encoding(x)
+            x = add_positional_encoding(self.positional_encoding, x, self.legacy)
             mask = self.generate_square_subsequent_mask(x.size(1)).to(self.device)
             x = self.transformer_decoder(x, tgt_mask=mask)
             x = self.output_layer(x)
-            x = x[:, -1, :]
+            x = gather_positions(x, pos)
 
         return x
     
@@ -352,11 +370,11 @@ class Critic(nn.Module):
         return output
     
 
-    def ppo_update(self, observation, return_tensor, weights_tensor):
+    def ppo_update(self, observation, return_tensor, weights_tensor, pos=None):
 
         self.optimizer.zero_grad()
-        with autocast(device_type=self.device.type, dtype=torch.float16):
-            new_pred_values = self(observation)
+        with amp_ctx(self):
+            new_pred_values = self(observation, pos)
             new_pred_reward = torch.sum(-new_pred_values * weights_tensor, dim=-1)
 
             value_loss = torch.mean((new_pred_reward - return_tensor) ** 2)
