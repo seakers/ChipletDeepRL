@@ -1,6 +1,7 @@
 import numpy as np
 
 from utils.evaluation import Chiplet_Configuration_Design
+from utils.geometry import boxes_vs_plate
 
 
 def sat_overlap(h1, c1, A1, h2, c2, A2):
@@ -37,7 +38,7 @@ def sat_overlap(h1, c1, A1, h2, c2, A2):
 class FastChipletDesign(Chiplet_Configuration_Design):
     """Same problem, with the pairwise overlap checks done in numpy."""
 
-    def overlap_cost_arbitrary(self, dimensions, locations, orientations, struct_dims, struct_locs, struct_orients):
+    def overlap_cost_arbitrary(self, dimensions, locations, orientations, struct_dims, struct_locs, struct_orients, struct_polys=None):
         n = len(dimensions)
         m = len(struct_dims)
         h = np.asarray(dimensions, dtype=float) / 2.0
@@ -50,24 +51,35 @@ class FastChipletDesign(Chiplet_Configuration_Design):
         hit = sat_overlap(h[i], c[i], A[i], h[j], c[j], A[j])
         overlap_ind[j[hit]] = True
 
-        # component-panel
-        if m:
-            hs = np.asarray(struct_dims, dtype=float) / 2.0
-            cs = np.asarray(struct_locs, dtype=float)
-            As = np.asarray(struct_orients, dtype=float)
+        overlap_ind |= self._hits_structure(h, c, A, struct_dims, struct_locs, struct_orients, struct_polys)
+        return overlap_ind.tolist()
+
+    def _hits_structure(self, h, c, A, struct_dims, struct_locs, struct_orients, struct_polys):
+        # (N,) bool: which boxes overlap a structure panel (boxes, or polygon plates)
+        hit_any = np.zeros(len(h), dtype=bool)
+        polys = struct_polys if struct_polys is not None else [None] * len(struct_dims)
+        boxes = [k for k, poly in enumerate(polys) if poly is None]
+        if boxes:
+            hs = np.asarray([struct_dims[k] for k in boxes], dtype=float) / 2.0
+            cs = np.asarray([struct_locs[k] for k in boxes], dtype=float)
+            As = np.asarray([struct_orients[k] for k in boxes], dtype=float)
+            n, m = len(h), len(boxes)
             ci, si = np.repeat(np.arange(n), m), np.tile(np.arange(m), n)
             hit = sat_overlap(h[ci], c[ci], A[ci], hs[si], cs[si], As[si])
-            overlap_ind[ci[hit]] = True
-        return overlap_ind.tolist()
+            hit_any[ci[hit]] = True
+        for k, poly in enumerate(polys):
+            if poly is not None:
+                hit_any |= boxes_vs_plate(h, c, A, poly, struct_dims[k][2], struct_locs[k], struct_orients[k])
+        return hit_any
 
     # ---- helpers for building and editing designs one component at a time ----
 
-    def structure_boxes(self):
+    def clear_of_structure(self, new):
+        # True if none of the boxes in `new` overlaps a structure panel
         panels = [p for p in self.structure_panels if p is not None]
-        h = np.array([p.dimensions for p in panels], dtype=float) / 2.0
-        c = np.array([p.location for p in panels], dtype=float)
-        A = np.array([p.orientation for p in panels], dtype=float)
-        return h, c, A
+        return not self._hits_structure(new[0], new[1], new[2], [p.dimensions for p in panels],
+                                        [p.location for p in panels], [p.orientation for p in panels],
+                                        [p.polygon for p in panels]).any()
 
     def component_boxes(self, i):
         """Boxes for component i (and its keep-out rod if it points), from its current placement."""

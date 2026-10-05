@@ -225,80 +225,72 @@ class Actor(nn.Module):
         return action_probs, action_ids
     
 
+    def _head_logprobs(self, i, obs, act, pos, pointing, pointing_var, nonpointing_var):
+        # log-probs of actions `act` under output head i
+        if self.des_space[i]['type'] == 'continuous':
+            params = gather_positions(self.forward(obs, i), pos)
+            return torch.distributions.Beta(params[:, 0], params[:, 1]).log_prob(act)
+        log_probs = torch.log(gather_positions(self.forward(obs, i), pos) + 1e-10)
+        if i == 5 or (i > 5 and (i - 5) % 5 == 0):  # panel choice indices
+            # pointing and nonpointing components have different valid panel choices
+            valid_mask = torch.zeros((obs.size(0), log_probs.size(1)), dtype=torch.bool, device=self.device)
+            if pointing.any():
+                valid_mask[pointing] = self.get_valid_panel_mask(obs[pointing], self.des_space, pointing_var)
+            if (~pointing).any():
+                valid_mask[~pointing] = self.get_valid_panel_mask(obs[~pointing], self.des_space, nonpointing_var)
+            log_probs = log_probs.masked_fill(~valid_mask, -1e9)
+            if not self.legacy:
+                # renormalize over valid panels like sample_action
+                log_probs = F.log_softmax(log_probs, dim=-1)
+        return log_probs.gather(1, act.long().unsqueeze(-1)).squeeze(-1)
+
+
     def ppo_update(self, observation, action, logprob, advantage, action_pos=None):
         # action_pos: position each action was sampled at (observations are zero padded)
+        # The loss is a mean over rows, so it is accumulated over chunks of rows (same gradient).
 
         self.optimizer.zero_grad()
-        with amp_ctx(self):
-            num_vars = observation.size(1) - self.num_objectives
-            new_log_probs = torch.zeros_like(action, dtype=torch.float32).to(self.device)
-            pointing_comps = torch.tensor(
-                [comp.pointing for comp in self.comp_list] * self.params['mini_batch_size'],
-                dtype=torch.bool,
-                device=self.device
-            )
-            # Find the index of the first pointing and first nonpointing component
-            first_pointing_idx = next((i for i, p in enumerate(pointing_comps) if p), None)
-            first_nonpointing_idx = next((i for i, p in enumerate(pointing_comps) if not p), None)
-            if not self.legacy:
-                # get_valid_panel_mask expects a variable index, not a component index
-                first_pointing_idx = 5 * (first_pointing_idx + 1)
-                first_nonpointing_idx = 5 * (first_nonpointing_idx + 1)
-            for i in range(len(self.des_space)):
-                var_mask = torch.zeros((observation.size(0)), dtype=torch.bool, device=self.device)
-                if i < 5:
-                    var_mask[i::num_vars] = True
-                else:
-                    var_mask[i::5] = True
-                    var_mask[i-5::num_vars] = False
-                var_observation = observation[var_mask]
-                var_action = action[var_mask]
-                var_pos = None if action_pos is None else action_pos[var_mask]
-                # need to separate discrete and continuous to calculate logprobs
-                if self.des_space[i]['type'] == 'continuous':
-                    params = gather_positions(self.forward(var_observation, i), var_pos)
-                    alpha = params[:,0].squeeze()
-                    beta = params[:,1].squeeze()
-                    action_dist = torch.distributions.Beta(alpha, beta)
-                    var_new_logprobs = action_dist.log_prob(var_action)
-                elif self.des_space[i]['type'] == 'discrete':
-                    pred_probs = gather_positions(self.forward(var_observation, i), var_pos)
-                    log_probs = torch.log(pred_probs + 1e-10)
-                    if i == 5 or (i > 5 and (i - 5) % 5 == 0):  # panel choice indices
-                        # pointing and nonpointing components have different valid panel choices
-                        valid_mask_pointing = self.get_valid_panel_mask(var_observation[pointing_comps], self.des_space, first_pointing_idx).to(self.device)
-                        valid_mask_nonpointing = self.get_valid_panel_mask(var_observation[~pointing_comps], self.des_space, first_nonpointing_idx).to(self.device)
-                        valid_mask = torch.zeros((var_observation.size(0), log_probs.size(1)), dtype=torch.bool, device=self.device)
-                        valid_mask[pointing_comps] = valid_mask_pointing
-                        valid_mask[~pointing_comps] = valid_mask_nonpointing
-                        log_probs[~valid_mask] = -1e9
-                        if not self.legacy:
-                            # renormalize over valid panels like sample_action
-                            log_probs = F.log_softmax(log_probs, dim=-1)
-                    var_new_logprobs = torch.sum(torch.mul(F.one_hot(var_action.long(), num_classes=len(self.des_space[i]['range'])), log_probs), dim=-1)
-                else:
-                    print("INVALID DESIGN SPACE")
+        n = observation.size(0)
+        num_vars = observation.size(1) - self.num_objectives
+        chunk = self.params.get('update_chunk', 2048)
+        pointing_list = [comp.pointing for comp in self.comp_list]
+        first_pointing_idx = pointing_list.index(True)
+        first_nonpointing_idx = pointing_list.index(False)
+        if not self.legacy:
+            # get_valid_panel_mask expects a variable index, not a component index
+            first_pointing_idx = 5 * (first_pointing_idx + 1)
+            first_nonpointing_idx = 5 * (first_nonpointing_idx + 1)
+        pointing_rows = torch.tensor(pointing_list * self.params['mini_batch_size'], dtype=torch.bool, device=self.device)
 
-                new_log_probs[var_mask] = var_new_logprobs
+        policy_loss, kl = 0.0, 0.0
+        for i in range(len(self.des_space)):
+            var_mask = torch.zeros(n, dtype=torch.bool, device=self.device)
+            if i < 5:
+                var_mask[i::num_vars] = True
+            else:
+                var_mask[i::5] = True
+                var_mask[i-5::num_vars] = False
+            rows = torch.nonzero(var_mask).squeeze(-1)
+            for s in range(0, len(rows), chunk):
+                r = rows[s:s + chunk]
+                pointing = pointing_rows[s:s + chunk] if i >= 5 else None
+                with amp_ctx(self):
+                    new_lp = self._head_logprobs(i, observation[r], action[r],
+                                                 None if action_pos is None else action_pos[r],
+                                                 pointing, first_pointing_idx, first_nonpointing_idx)
+                    ratio = torch.exp(new_lp - logprob[r])
+                    adv = advantage[r]
+                    min_advantage = torch.where(adv > 0, (1 + self.clip_ratio) * adv, (1 - self.clip_ratio) * adv)
+                    loss = -torch.sum(torch.min(ratio * adv, min_advantage)) / n
+                self.scaler.scale(loss).backward()
+                policy_loss += loss.item()
+                kl += torch.sum(new_lp - logprob[r]).item() / n
 
-            new_log_probs = new_log_probs.view(-1)
-
-            ratio = torch.exp(new_log_probs - logprob)
-            min_advantage = torch.where(
-                advantage > 0,
-                (1 + self.clip_ratio) * advantage,
-                (1 - self.clip_ratio) * advantage
-            )
-            policy_loss = -torch.mean(torch.min(ratio * advantage, min_advantage))
-
-        self.scaler.scale(policy_loss).backward()
         self.scaler.step(self.optimizer)
         self.scaler.update()
         self.scheduler.step()
 
-        kl = torch.mean(new_log_probs - logprob)
-
-        return policy_loss.item(), kl.item()
+        return policy_loss, kl
     
 
 class Critic(nn.Module):
@@ -373,15 +365,21 @@ class Critic(nn.Module):
     def ppo_update(self, observation, return_tensor, weights_tensor, pos=None):
 
         self.optimizer.zero_grad()
-        with amp_ctx(self):
-            new_pred_values = self(observation, pos)
-            new_pred_reward = torch.sum(-new_pred_values * weights_tensor, dim=-1)
+        # accumulate over chunks (same gradient as one batch, much less GPU memory)
+        n = observation.size(0)
+        chunk = self.params.get('update_chunk', 2048)
+        value_loss = 0.0
+        for s in range(0, n, chunk):
+            sl = slice(s, s + chunk)
+            with amp_ctx(self):
+                new_pred_values = self(observation[sl], None if pos is None else pos[sl])
+                new_pred_reward = torch.sum(-new_pred_values * weights_tensor[sl], dim=-1)
+                loss = torch.sum((new_pred_reward - return_tensor[sl]) ** 2) / n
+            self.scaler.scale(loss).backward()
+            value_loss += loss.item()
 
-            value_loss = torch.mean((new_pred_reward - return_tensor) ** 2)
-
-        self.scaler.scale(value_loss).backward()
         self.scaler.step(self.optimizer)
         self.scaler.update()
         self.scheduler.step()
 
-        return value_loss.item()
+        return value_loss

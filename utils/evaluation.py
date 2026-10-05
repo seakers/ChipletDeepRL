@@ -2,21 +2,16 @@ import numpy as np
 from copy import deepcopy
 
 from utils.config_utils import faceAndRot2DCM, align_cuboid_with_plane
-import itertools
-import itertools
+from utils.geometry import boxes_vs_plate, point_in_polygon, plate_inertia, box_inertia
 import itertools
 from collections import deque
 
 
 class Chiplet_Configuration_Design():
 
-    def __init__(self, component_list, structure_panel, fix_face_offsets=False):
-        
+    def __init__(self, component_list, structure_panel):
+
         self.problem_name = 'Chiplet_Configuration'
-        # The pointing rods and wire ports were offset by dims * world direction, which uses the
-        # wrong dimension unless the component's x axis is along world x. True offsets by the
-        # component's own x half-length instead.
-        self.fix_face_offsets = fix_face_offsets
         self.num_objectives = 5
         self.num_constraints = 3
 
@@ -70,16 +65,19 @@ class Chiplet_Configuration_Design():
         return dist
     
 
-    def inertia_cost(self, dimensions, locations, masses):
-        
-        # Calculate the moment of inertia (simplified)
+    def inertia_cost(self, dimensions, locations, masses, orientations, polygons=None):
+
+        # Calculate the moment of inertia about the origin
         inertia = np.zeros((3, 3))
         for i in range(len(dimensions)):
-            Icm = 1 / 12 * masses[i] * np.array([
-                [(dimensions[i][1] ** 2 + dimensions[i][2] ** 2), 0, 0],
-                [0, (dimensions[i][0] ** 2 + dimensions[i][2] ** 2), 0],
-                [0, 0, (dimensions[i][0] ** 2 + dimensions[i][1] ** 2)]
-            ])
+            poly = polygons[i] if polygons is not None else None
+            if poly is None:
+                Icm = box_inertia(dimensions[i], masses[i])
+            else:
+                Icm = plate_inertia(poly, dimensions[i][2], masses[i])
+            # rotate the body-frame inertia into the world frame
+            R = np.asarray(orientations[i], dtype=float)
+            Icm = R @ Icm @ R.T
             skew_sym = np.array([
                 [0, -locations[i][2], locations[i][1]],
                 [locations[i][2], 0, -locations[i][0]],
@@ -117,7 +115,7 @@ class Chiplet_Configuration_Design():
         return overlap
 
 
-    def overlap_cost_arbitrary(self, dimensions, locations, orientations, struct_dims, struct_locs, struct_orients):
+    def overlap_cost_arbitrary(self, dimensions, locations, orientations, struct_dims, struct_locs, struct_orients, struct_polys=None):
         
         num_comps = len(dimensions)
         num_panels = len(struct_dims)
@@ -135,10 +133,17 @@ class Chiplet_Configuration_Design():
         struct_comp_pair_list = itertools.product(range(num_comps), range(num_panels))
         for struct_pair in struct_comp_pair_list:
             comp_ind, struct_ind = struct_pair
-            overlap_bool = self.separating_axis_test(
-                dimensions[comp_ind], locations[comp_ind], orientations[comp_ind],
-                struct_dims[struct_ind], struct_locs[struct_ind], struct_orients[struct_ind]
-            )
+            if struct_polys is not None and struct_polys[struct_ind] is not None:
+                # triangle and hexagon top, bottom and shelf panels are polygons, not rectangles
+                overlap_bool = boxes_vs_plate(
+                    np.array(dimensions[comp_ind]) / 2, locations[comp_ind], orientations[comp_ind],
+                    struct_polys[struct_ind], struct_dims[struct_ind][2], struct_locs[struct_ind], struct_orients[struct_ind]
+                )[0]
+            else:
+                overlap_bool = self.separating_axis_test(
+                    dimensions[comp_ind], locations[comp_ind], orientations[comp_ind],
+                    struct_dims[struct_ind], struct_locs[struct_ind], struct_orients[struct_ind]
+                )
             if overlap_bool:
                 # print(f"Overlap detected between component {comp_ind} and structure panel {struct_ind}")
                 overlap_ind[comp_ind] = True
@@ -185,10 +190,9 @@ class Chiplet_Configuration_Design():
 
 
     def face_offset(self, dims, direction):
-        # center of the component's local +/-x face relative to its center
-        if self.fix_face_offsets:
-            return dims[0] / 2 * np.asarray(direction)
-        return np.multiply(np.array(dims) / 2, direction)
+        # center of the component's local +/-x face relative to its center.
+        # direction is the component's x axis in world coordinates, so the offset is dims[0]/2 along it
+        return dims[0] / 2 * np.asarray(direction)
 
 
     def wire_cost(self, dimensions, locations, types, orientations):
@@ -207,7 +211,7 @@ class Chiplet_Configuration_Design():
         return tot_wire_len
 
 
-    def thermal_cost(self, dimensions, locations, heat_disps, struct_dims, struct_locs):
+    def thermal_cost(self, dimensions, locations, heat_disps, struct_dims, struct_locs, shell_area=None):
 
         stefan_boltzmann_const = 5.670374419e-8  # W/m^2K^4
         
@@ -218,9 +222,8 @@ class Chiplet_Configuration_Design():
         #       because low alpha/high epsilon gives a cool equilibrium temp
         
         # Surface area of structure
-        surf_area = 0
-        for dim in struct_dims[:8]:  # only shell panels, not shelves
-            surf_area += dim[0] * dim[1]
+        # outer shell area (panels 0-7 of structure_panels; shelves are internal)
+        surf_area = shell_area
         
         # Average sunlit area (sphere approximation = 1/4 total area)
         average_sunlit_area = surf_area / 4
@@ -321,15 +324,15 @@ class Chiplet_Configuration_Design():
         return connected
 
 
-    def constraint_cost(self, dimensions, locations, types, orientations, masses, pointing, struct_dims, struct_locs, struct_orients):
-        
+    def constraint_cost(self, dimensions, locations, types, orientations, masses, pointing, struct_dims, struct_locs, struct_orients, struct_polys=None):
+
         new_point_locs, new_point_dims, new_point_orients = self.pointing_obj(dimensions, locations, types, orientations, pointing)
 
         overlap_inds = self.overlap_cost_arbitrary(
             dimensions + new_point_dims,
             locations + new_point_locs,
             orientations + new_point_orients,
-            struct_dims, struct_locs, struct_orients
+            struct_dims, struct_locs, struct_orients, struct_polys
         )
         
         return overlap_inds
@@ -502,8 +505,18 @@ class Chiplet_Configuration_Design():
             structure_panels[start_ind+ind] = deepcopy(self.base_panel)
             structure_panels[start_ind+ind].location = [0, 0, -z_dim/2 + distance_between_shelves*(ind+1)]
             structure_panels[start_ind+ind].dimensions = [x_dim, y_dim, structure_panels[start_ind+ind].thickness]
-        
+            structure_panels[start_ind+ind].polygon = self.cross_section(shape, x_dim, y_dim)
+
         return structure_panels
+
+    def cross_section(self, shape, x_dim, y_dim):
+        # vertices of the shell's cross-section; None for the rectangle (the panel itself)
+        if shape == 0:
+            return np.array([[-x_dim/4, -y_dim/2], [x_dim/2, 0], [-x_dim/4, y_dim/2]])
+        if shape == 2:
+            return np.array([[-x_dim/2, -y_dim/4], [0, -y_dim/2], [x_dim/2, -y_dim/4],
+                             [x_dim/2, y_dim/4], [0, y_dim/2], [-x_dim/2, y_dim/4]])
+        return None
     
 
     def get_structural_panels(self, x):
@@ -519,6 +532,11 @@ class Chiplet_Configuration_Design():
         else:
             raise ValueError(f"INVALID STRUCTURE SHAPE {x[0]}")
         
+        # top and bottom panels have the cross-section's shape
+        # (both are symmetric in y, so the top panel's flipped frame gives the same polygon)
+        for k in (0, 1):
+            structure_panels[k].polygon = self.cross_section(x[0], x[1], x[2])
+
         # shelves
         structure_panels = self.get_shelves(structure_panels, x[0], x[1], x[2], x[3], x[4])
         self.structure_panels = structure_panels
@@ -548,7 +566,7 @@ class Chiplet_Configuration_Design():
             elif compPanel >= len(self.structure_panels):  # underside of shelf
                 panelChoice = self.structure_panels[int(compPanel - self.max_shelves)]
                 panelChoiceDCM = panelChoice.orientation
-                panelChoiceDCM = np.matmul(panelChoiceDCM,np.array([[1,0,0],[0,1,0],[0,0,-1]]))
+                panelChoiceDCM = np.matmul(panelChoiceDCM,np.array([[1,0,0],[0,-1,0],[0,0,-1]]))  # 180 deg about x
                 # surfNormal = np.array([0,0,-1])
             else:
                 panelChoice = self.structure_panels[int(compPanel)]
@@ -569,6 +587,12 @@ class Chiplet_Configuration_Design():
             offsetVect = np.matmul(panelChoiceDCM,surfNormal*(dimOffset+panelOffset))
             
             surfLoc = np.matmul(panelChoiceDCM,np.multiply([compLoc[0],compLoc[1],surfNormal[2]],np.array(panelChoice.dimensions)/2))
+            # on a polygon panel the component's center has to be on the panel
+            if panelChoice.polygon is None:
+                self.component_list[i].off_panel = False
+            else:
+                inPanel = np.asarray(panelChoice.orientation).T @ surfLoc
+                self.component_list[i].off_panel = not point_in_polygon(inPanel[:2], panelChoice.polygon)
             compLoc = surfLoc + offsetVect + panelChoice.location
             self.component_list[i].location = compLoc
 
@@ -621,8 +645,10 @@ class Chiplet_Configuration_Design():
         struct_dims = []
         struct_locs = []
         struct_orients = []
+        struct_polys = []
         for panel in self.structure_panels:
             if panel is not None:
+                struct_polys.append(panel.polygon)
                 struct_masses.append(panel.mass)
                 # struct_dims.append(np.matmul(np.abs(panel.orientation), panel.dimensions))
                 struct_dims.append(panel.dimensions)
@@ -632,8 +658,11 @@ class Chiplet_Configuration_Design():
         # Get the cost from each cost source
         overlap_inds = self.constraint_cost(
             dimensions, locations, types, orientations, masses, pointing,
-            struct_dims, struct_locs, struct_orients
+            struct_dims, struct_locs, struct_orients, struct_polys
         )
+        overlap_inds = list(overlap_inds)
+        for k, comp in enumerate(self.component_list):
+            overlap_inds[k] = overlap_inds[k] or comp.off_panel
         if any(overlap_inds):
             constraint_violated = True
         else:            
@@ -645,14 +674,16 @@ class Chiplet_Configuration_Design():
             locations, masses, struct_locs, struct_masses
         )
         off_axis_inertia, on_axis_inertia = self.inertia_cost(
-            dimensions + struct_dims, locations + struct_locs, masses + struct_masses
+            dimensions + struct_dims, locations + struct_locs, masses + struct_masses,
+            orientations + struct_orients, [None] * len(dimensions) + struct_polys
         )
         wire_cost_val = self.wire_cost(
             dimensions, locations, types, orientations
         )
         thermal_cost_val = self.thermal_cost(
             dimensions, locations, heat_disps,
-            struct_dims, struct_locs
+            struct_dims, struct_locs,
+            shell_area=sum(p.area for p in self.structure_panels[:8] if p is not None)
         )
 
         cost_list = [

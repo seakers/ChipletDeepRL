@@ -24,7 +24,11 @@ def place_clear(ev, x, i, others, rng, tries):
     for _ in range(tries):
         x[5 + 5 * i:10 + 5 * i] = random_component_genes(ev, x, i, rng)
         ev.place_component(i, x)
+        if ev.component_list[i].off_panel:
+            continue
         new = ev.component_boxes(i)
+        if not ev.clear_of_structure(new):
+            continue
         if len(new[0]) > 1 and not ev.boxes_clear(tuple(a[:1] for a in new), tuple(a[1:] for a in new)):
             continue
         if ev.boxes_clear(new, others):
@@ -34,6 +38,9 @@ def place_clear(ev, x, i, others, rng, tries):
 
 def stack(a, b):
     return tuple(np.concatenate([p, q]) for p, q in zip(a, b))
+
+
+EMPTY = (np.zeros((0, 3)), np.zeros((0, 3)), np.zeros((0, 3, 3)))
 
 
 def construct_feasible(ev, rng, structure=None, tries=500, max_structures=20):
@@ -51,7 +58,7 @@ def construct_feasible(ev, rng, structure=None, tries=500, max_structures=20):
             s = list(structure)
         x = s + [0] * (5 * ev.num_components)
         ev.get_structural_panels(x)
-        placed = ev.structure_boxes()
+        placed = EMPTY
         ok = True
         for i in rng.permutation(ev.num_components):
             new = place_clear(ev, x, int(i), placed, rng, tries)
@@ -81,9 +88,10 @@ def repair_overlaps(ev, x, rng, tries=20):
     flags = ev.constraint_cost(dims, locs, types, orientations=orients, masses=None, pointing=pointing,
                                struct_dims=[p.dimensions for p in struct],
                                struct_locs=[p.location for p in struct],
-                               struct_orients=[p.orientation for p in struct])
+                               struct_orients=[p.orientation for p in struct],
+                               struct_polys=[p.polygon for p in struct])
     n = ev.num_components
-    bad = [i for i in range(n) if flags[i]]
+    bad = [i for i in range(n) if flags[i] or ev.component_list[i].off_panel]
     # a rod overlap (index >= n) belongs to the pointing component that owns it
     rod_owner = [i for i in range(n) if pointing[i]]
     bad += [rod_owner[k - n] for k in range(n, len(flags)) if flags[k]]
@@ -91,7 +99,7 @@ def repair_overlaps(ev, x, rng, tries=20):
     if not bad:
         return x
     keep = [i for i in range(n) if i not in bad]
-    placed = ev.structure_boxes()
+    placed = EMPTY
     for i in keep:
         placed = stack(placed, ev.component_boxes(i))
     for i in rng.permutation(bad):
