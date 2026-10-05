@@ -1,3 +1,4 @@
+import time
 from contextlib import nullcontext
 
 import torch
@@ -40,3 +41,10 @@ def unique_var_index(var_idx, num_unique=10, num_struct=5):
     if var_idx < num_struct:
         return var_idx
     return num_struct + (var_idx - num_struct) % (num_unique - num_struct)
+
+
+def throttle(params, t_start):
+    # params['gpu_duty'] < 1 sleeps after each epoch so the GPU is busy only that fraction of the time
+    duty = params.get('gpu_duty', 1.0)
+    if duty < 1.0:
+        time.sleep((time.time() - t_start) * (1.0 / duty - 1.0))

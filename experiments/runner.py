@@ -135,6 +135,8 @@ def true_front(all_obj, max_values):
 def run_job(job, args, overrides, max_values):
     fn, needs_ref, _ = _methods()[job['method']]
     set_seed(job['seed'])
+    if torch.cuda.is_available() and args.gpu_memory_fraction < 1.0:
+        torch.cuda.set_per_process_memory_fraction(args.gpu_memory_fraction)
 
     params = dict(BASE_PARAMS)
     params.update(overrides)
@@ -203,6 +205,7 @@ def main():
     ap.add_argument('--ref', help='max_values .npy shared by every job (required for all but random)')
     ap.add_argument('--actors', help='folder with pretrained actor .pth files for the hybrids')
     ap.add_argument('--set', action='append', metavar='KEY=VALUE', help='params override, repeatable')
+    ap.add_argument('--gpu-memory-fraction', type=float, default=1.0, help='cap on GPU memory per process')
     ap.add_argument('--shard', type=int, default=0)
     ap.add_argument('--nshards', type=int, default=1)
     args = ap.parse_args()
