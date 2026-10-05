@@ -11,6 +11,7 @@ import os
 
 import numpy as np
 from scipy import stats
+from pymoo.indicators.hv import HV
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -28,6 +29,7 @@ def main():
     ap.add_argument('tag')
     ap.add_argument('--base', help='arm to compare against')
     ap.add_argument('--at', type=int, help='use HV at this NFE (from the 20-point curve) instead of the final HV')
+    ap.add_argument('--exact', action='store_true', help="exact HV of the saved true front (pymoo) instead of the grid HV")
     args = ap.parse_args()
 
     rows = load(args.tag)
@@ -35,7 +37,14 @@ def main():
     rows = [r for r in rows if 'error' not in r]
     arms = list(dict.fromkeys(r.get('arm', r['method']) for r in rows))
 
+    exact_cache = {}
+
     def hv(r):
+        if args.exact:
+            if r['job_id'] not in exact_cache:
+                front = np.array(r.get('front', []))
+                exact_cache[r['job_id']] = float(HV(ref_point=np.ones(5))(front)) if len(front) else 0.0
+            return exact_cache[r['job_id']]
         if args.at is None:
             return r['final_hv']
         below = [h for n, h in r['hv_curve'] if n <= args.at]

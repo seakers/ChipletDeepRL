@@ -154,7 +154,11 @@ def run_genetic_algorithm(max_obj, params, eval_function):
         return offspring
 
     ga_kwargs = {}
-    if params.get('ga_init') == 'construct':
+    if params.get('ga_init') == 'file':
+        # final population saved by an earlier run, e.g. on a different manifest
+        init = np.load(params['ga_init_path'].format(seed=params.get('seed')))
+        ga_kwargs['initial_population'] = init[:pop_size]
+    elif params.get('ga_init') == 'construct':
         init = []
         while len(init) < pop_size:
             x = construct_feasible(eval_function, rng)
@@ -215,6 +219,8 @@ def run_genetic_algorithm(max_obj, params, eval_function):
         #     print(f"Pareto front objectives:\n{hv_grid.paretoFrontPoint}" + \
         #           f"\nCorresponding designs:\n{hv_grid.paretoFrontSolution}")
     print(f"Total NFE: {NFE}")
+    if params.get('save_path'):
+        np.save(params['save_path'] + 'population.npy', ga_instance.population)
     if oracle_info:
         params['oracle_info'] = float(np.mean(oracle_info))
 

@@ -26,7 +26,7 @@ os.chdir(ROOT)  # methods save to results/<date_str>/
 import numpy as np
 import torch
 
-from utils.component_list import getComponents
+from utils.component_list import getComponents, create_varied_components
 from utils.component_classes import StructPanel
 from utils.fast_evaluation import FastChipletDesign
 from utils.hypervolume_utils import is_pareto_efficient
@@ -154,7 +154,13 @@ def run_job(job, args, overrides, max_values):
                 shutil.copy2(src, os.path.join(work, name))
         params['model_folder'] = args.actors
 
-    components, _ = getComponents()
+    if params.get('manifest_seed') is not None:
+        # a varied manifest: same component types, masses and sizes within +-30%
+        random.seed(params['manifest_seed'])
+        components = create_varied_components(num_sets=1)[0]
+        random.seed(job['seed'])
+    else:
+        components, _ = getComponents()
     # same results as Chiplet_Configuration_Design, faster overlap checks
     eval_function = FastChipletDesign(components, StructPanel())
     violated = []
