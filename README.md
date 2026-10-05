@@ -41,4 +41,11 @@ design repair PPO    0.084 -0.007  0.084     0 0 0
   `main.py` sets it to `None`.
 - The unused transformer variants (`hv`, `hv_informed`, `informed_attn`, `multi`, `random`)
   still have the old bugs.
-- No random design out of 16,000 was feasible, so max_values only comes from infeasible designs.
+- In `evaluation.py` the pointing keep-out rods and wire ports are offset with the wrong
+  dimension unless the component points along world x, so most pointing placements overlap
+  their own rod. `fix_face_offsets=True` fixes it; it is off by default.
+- No random design out of 16,000 was feasible, so a max_values built from random designs
+  only describes infeasible ones. `experiments/reference/feasible.npy` is built from
+  constructed feasible designs instead.
+
+Results of the October experiments are in `experiments/RESULTS.md`.
