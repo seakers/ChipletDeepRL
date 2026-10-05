@@ -7,7 +7,8 @@ from torch.cuda.amp import GradScaler
 import math
 from scipy.stats import norm
 
-from utils.ppo_utils import is_legacy, amp_settings, amp_ctx, add_positional_encoding, gather_positions
+from utils.ppo_utils import is_legacy, amp_settings, amp_ctx, add_positional_encoding, gather_positions, throttle
+import time
 
 
 
@@ -272,6 +273,7 @@ class Actor(nn.Module):
                 var_mask[i-5::num_vars] = False
             rows = torch.nonzero(var_mask).squeeze(-1)
             for s in range(0, len(rows), chunk):
+                t_chunk = time.time()
                 r = rows[s:s + chunk]
                 pointing = pointing_rows[s:s + chunk] if i >= 5 else None
                 with amp_ctx(self):
@@ -285,6 +287,7 @@ class Actor(nn.Module):
                 self.scaler.scale(loss).backward()
                 policy_loss += loss.item()
                 kl += torch.sum(new_lp - logprob[r]).item() / n
+                throttle(self.params, t_chunk, sync=True)
 
         self.scaler.step(self.optimizer)
         self.scaler.update()
@@ -370,6 +373,7 @@ class Critic(nn.Module):
         chunk = self.params.get('update_chunk', 2048)
         value_loss = 0.0
         for s in range(0, n, chunk):
+            t_chunk = time.time()
             sl = slice(s, s + chunk)
             with amp_ctx(self):
                 new_pred_values = self(observation[sl], None if pos is None else pos[sl])
@@ -377,6 +381,7 @@ class Critic(nn.Module):
                 loss = torch.sum((new_pred_reward - return_tensor[sl]) ** 2) / n
             self.scaler.scale(loss).backward()
             value_loss += loss.item()
+            throttle(self.params, t_chunk, sync=True)
 
         self.scaler.step(self.optimizer)
         self.scaler.update()

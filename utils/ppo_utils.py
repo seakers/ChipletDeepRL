@@ -43,8 +43,10 @@ def unique_var_index(var_idx, num_unique=10, num_struct=5):
     return num_struct + (var_idx - num_struct) % (num_unique - num_struct)
 
 
-def throttle(params, t_start):
-    # params['gpu_duty'] < 1 sleeps after each epoch so the GPU is busy only that fraction of the time
+def throttle(params, t_start, sync=False):
+    # params['gpu_duty'] < 1 sleeps so the GPU is busy only about that fraction of the time
     duty = params.get('gpu_duty', 1.0)
     if duty < 1.0:
+        if sync and torch.cuda.is_available():
+            torch.cuda.synchronize()
         time.sleep((time.time() - t_start) * (1.0 / duty - 1.0))
