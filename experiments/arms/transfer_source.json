@@ -1,1 +1,0 @@
-[{"name": "src_m1", "method": "ga", "set": {"ga_mutation": "component", "ga_keep_elitism": 8, "ga_init": "construct", "ga_repair": true, "manifest_seed": 1}}]

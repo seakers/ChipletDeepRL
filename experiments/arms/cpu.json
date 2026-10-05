@@ -1,0 +1,150 @@
+[
+ {
+  "name": "random",
+  "method": "random"
+ },
+ {
+  "name": "lab",
+  "method": "ga"
+ },
+ {
+  "name": "lab_construct",
+  "method": "ga",
+  "set": {
+   "ga_init": "construct"
+  }
+ },
+ {
+  "name": "lab_repair",
+  "method": "ga",
+  "set": {
+   "ga_repair": true
+  }
+ },
+ {
+  "name": "lab_construct_repair",
+  "method": "ga",
+  "set": {
+   "ga_init": "construct",
+   "ga_repair": true
+  }
+ },
+ {
+  "name": "comp",
+  "method": "ga",
+  "set": {
+   "ga_mutation": "component",
+   "ga_keep_elitism": 8
+  }
+ },
+ {
+  "name": "comp_construct",
+  "method": "ga",
+  "set": {
+   "ga_mutation": "component",
+   "ga_keep_elitism": 8,
+   "ga_init": "construct"
+  }
+ },
+ {
+  "name": "comp_repair",
+  "method": "ga",
+  "set": {
+   "ga_mutation": "component",
+   "ga_keep_elitism": 8,
+   "ga_repair": true
+  }
+ },
+ {
+  "name": "comp_construct_repair",
+  "method": "ga",
+  "set": {
+   "ga_mutation": "component",
+   "ga_keep_elitism": 8,
+   "ga_init": "construct",
+   "ga_repair": true
+  }
+ },
+ {
+  "name": "nsga3",
+  "method": "nsga3"
+ },
+ {
+  "name": "nsga3_construct",
+  "method": "nsga3",
+  "set": {
+   "ga_init": "construct"
+  }
+ },
+ {
+  "name": "construct_only",
+  "method": "construct"
+ },
+ {
+  "name": "oracle_free",
+  "method": "ga",
+  "set": {
+   "ga_mutation": "component",
+   "ga_keep_elitism": 8,
+   "ga_init": "construct",
+   "ga_repair": true,
+   "ga_oracle": "free"
+  }
+ },
+ {
+  "name": "oracle_charged",
+  "method": "ga",
+  "set": {
+   "ga_mutation": "component",
+   "ga_keep_elitism": 8,
+   "ga_init": "construct",
+   "ga_repair": true,
+   "ga_oracle": "charged"
+  }
+ },
+ {
+  "name": "struct_0.2",
+  "method": "ga",
+  "set": {
+   "ga_mutation": "component",
+   "ga_keep_elitism": 8,
+   "ga_init": "construct",
+   "ga_repair": true,
+   "ga_structure_mutation_rate": 0.2
+  }
+ },
+ {
+  "name": "immig_0.2",
+  "method": "ga",
+  "set": {
+   "ga_mutation": "component",
+   "ga_keep_elitism": 8,
+   "ga_init": "construct",
+   "ga_repair": true,
+   "ga_immigrant_rate": 0.2
+  }
+ },
+ {
+  "name": "immig_0.5",
+  "method": "ga",
+  "set": {
+   "ga_mutation": "component",
+   "ga_keep_elitism": 8,
+   "ga_init": "construct",
+   "ga_repair": true,
+   "ga_immigrant_rate": 0.5
+  }
+ },
+ {
+  "name": "struct_0.2_immig_0.2",
+  "method": "ga",
+  "set": {
+   "ga_mutation": "component",
+   "ga_keep_elitism": 8,
+   "ga_init": "construct",
+   "ga_repair": true,
+   "ga_structure_mutation_rate": 0.2,
+   "ga_immigrant_rate": 0.2
+  }
+ }
+]

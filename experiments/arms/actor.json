@@ -1,1 +1,0 @@
-[{"name": "actor_construct_repair", "method": "ga", "set": {"ga_mutation": "actor", "ga_keep_elitism": 8, "ga_init": "construct", "ga_repair": true, "repair_actor_path": "results/runs/trainrep/repair_s0/actor_spacecraft_repair_model.pth"}}]
