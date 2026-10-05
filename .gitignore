@@ -14,3 +14,5 @@ chiplet_model/dse/lib/__pycache__/
 
 logs/*
 !logs/.gitkeep
+
+experiments/logs/

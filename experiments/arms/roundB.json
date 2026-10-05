@@ -1,0 +1,8 @@
+[
+  {"name": "construct_only", "method": "construct"},
+  {"name": "comp_construct_repair", "method": "ga", "set": {"ga_mutation": "component", "ga_keep_elitism": 8, "ga_init": "construct", "ga_repair": true}},
+  {"name": "oracle_free", "method": "ga", "set": {"ga_mutation": "component", "ga_keep_elitism": 8, "ga_init": "construct", "ga_repair": true, "ga_oracle": "free"}},
+  {"name": "oracle_charged", "method": "ga", "set": {"ga_mutation": "component", "ga_keep_elitism": 8, "ga_init": "construct", "ga_repair": true, "ga_oracle": "charged"}},
+  {"name": "nsga3_construct", "method": "nsga3", "set": {"ga_init": "construct"}},
+  {"name": "lab_construct", "method": "ga", "set": {"ga_init": "construct"}}
+]

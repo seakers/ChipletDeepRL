@@ -29,6 +29,7 @@ import torch
 from utils.component_list import getComponents
 from utils.component_classes import StructPanel
 from utils.fast_evaluation import FastChipletDesign
+from utils.hypervolume_utils import is_pareto_efficient
 
 
 def _methods():
@@ -39,6 +40,8 @@ def _methods():
     from optimization.warm_start_ga import run_warm_start_ga
     from optimization.intelligent_mutation import run_intelligent_mutation_ga
     from optimization.warm_start_intelligent_ga import run_warm_start_intelligent_ga
+    from optimization.nsga3 import run_nsga3
+    from optimization.construct_search import run_construct_search
     # key: (function, needs max_values, name in main.py)
     return {
         'random': (run_random_search, False, 'Random Search'),
@@ -48,6 +51,8 @@ def _methods():
         'wsga': (run_warm_start_ga, True, 'Warm Start GA'),
         'imga': (run_intelligent_mutation_ga, True, 'Intelligent Mutation GA'),
         'wsimga': (run_warm_start_intelligent_ga, True, 'Warm Start Intelligent Mutation GA'),
+        'nsga3': (run_nsga3, True, 'NSGA-III (pymoo)'),
+        'construct': (run_construct_search, True, 'Constructed random search'),
     }
 
 
@@ -115,6 +120,18 @@ def checkpoints(hypervolumes, n=20):
     return [[int(i) + 1, float(hypervolumes[i])] for i in idx]
 
 
+def true_front(all_obj, max_values):
+    if max_values is None:
+        return []
+    obj = np.asarray(all_obj, dtype=float) / max_values
+    obj = obj[~np.all(np.isclose(obj, 1.0), axis=1)]  # infeasible designs are stored at max_values
+    obj = obj[np.all(obj < 1.0, axis=1)]
+    if len(obj) == 0:
+        return []
+    front = obj[is_pareto_efficient(obj)]
+    return np.round(np.unique(front, axis=0), 6).tolist()
+
+
 def run_job(job, args, overrides, max_values):
     fn, needs_ref, _ = _methods()[job['method']]
     set_seed(job['seed'])
@@ -160,6 +177,8 @@ def run_job(job, args, overrides, max_values):
         'final_hv': float(hypervolumes[-1]) if hypervolumes else 0.0,
         'nfe': int(out[5]),
         'front_size': int(len(front)),
+        # true nondominated set of all feasible designs, normalized, for checking the HV metric
+        'front': true_front(out[1], max_values),
         'n_feasible': int(len(violated) - sum(violated)),
         'first_feasible_nfe': next((k + 1 for k, v in enumerate(violated) if not v), None),
         'hv_curve': checkpoints(hypervolumes),

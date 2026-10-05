@@ -97,5 +97,14 @@ class HypervolumeGrid:
             self.paretoFrontPoint = self.paretoFrontPoint[mask]
             self.paretoFrontSolution = self.paretoFrontSolution[mask]
 
+    def contribution(self, point):
+        """HV the point would add to the grid, without adding it."""
+        gridPoint = np.floor((self.refPoint - np.asarray(point)) / self.refPoint * (self.gridSize - 1))
+        if np.any(gridPoint < 0):
+            return 0.0
+        grid = self.dominated.reshape((self.gridSize,) * len(self.refPoint))
+        box = grid[tuple(slice(0, int(g) + 1) for g in gridPoint)]
+        return (box.size - np.count_nonzero(box)) / self.numPoints * self.HVMax
+
     def getHV(self):
         return np.sum(self.dominated)/self.numPoints * self.HVMax

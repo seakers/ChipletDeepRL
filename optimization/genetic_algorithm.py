@@ -50,6 +50,19 @@ def run_genetic_algorithm(max_obj, params, eval_function):
     # Define the fitness function for the genetic algorithm
     rng = np.random.default_rng(params.get('seed'))
     nfe_budget = params.get('nfe_budget')
+    oracle = params.get('ga_oracle')  # None, 'free' or 'charged'
+    live_hv = HypervolumeGrid(refPoint=[1.0]*num_objectives)  # archive the oracle scores against
+    oracle_info = []
+
+    def record(solution, objectives, constraints, constraint_vals):
+        nonlocal NFE
+        all_des.append(np.array(solution))
+        all_obj.append(objectives)
+        all_constraints.append(constraints)
+        all_constraint_vals.append(constraint_vals)
+        NFE += 1
+        if not constraints:
+            live_hv.updateHV(np.array(objectives) / max_obj, np.array(solution))
 
     def fitness_func(ga_instance, solution, solution_idx):
         # print(f"Evaluating solution {solution}")
@@ -59,12 +72,7 @@ def run_genetic_algorithm(max_obj, params, eval_function):
             solution[:] = repair_overlaps(eval_function, solution, rng)
         objectives, constraints, constraint_vals = eval_function.evaluate(solution)
         # print(f"Objectives: {objectives}")
-        nonlocal all_des, all_obj, all_constraints, NFE, all_constraint_vals
-        all_des.append(solution)
-        all_obj.append(objectives)
-        all_constraints.append(constraints)
-        all_constraint_vals.append(constraint_vals)
-        NFE += 1
+        record(solution, objectives, constraints, constraint_vals)
         if constraints:
             return -np.array(np.append(max_obj,constraint_vals), dtype=float)
         else:
@@ -78,17 +86,71 @@ def run_genetic_algorithm(max_obj, params, eval_function):
         if nfe_budget is not None and NFE >= nfe_budget:
             return "stop"
 
-    def component_mutation(offspring, ga_instance):
+    def mutate_components(child):
         # re-sample all 5 genes of a few components instead of single genes
-        n_comp = eval_function.num_components
         k = params.get('ga_components_per_mutation', 1)
+        for i in rng.choice(eval_function.num_components, size=k, replace=False):
+            child[5+5*i] = rng.choice(valid_panels(eval_function, child, i))
+            child[6+5*i] = des_space[6]['range'][rng.integers(101)]
+            child[7+5*i] = des_space[7]['range'][rng.integers(101)]
+            child[8+5*i] = rng.integers(6)
+            child[9+5*i] = des_space[9]['range'][rng.integers(36)]
+
+    def oracle_move(child):
+        # try K component moves and keep the one adding the most HV to the archive.
+        # 'free' does not count the lookahead evaluations; 'charged' counts and scores them.
+        best, best_gain, any_gain = None, -1.0, False
+        for _ in range(params.get('ga_oracle_k', 8)):
+            cand = np.array(child)
+            mutate_components(cand)
+            cand = np.array(repair_invalid_panels(cand))
+            if params.get('ga_repair', False):
+                cand[:] = repair_overlaps(eval_function, cand, rng)
+            if oracle == 'charged':
+                objectives, constraints, constraint_vals = eval_function.evaluate(cand)
+            else:
+                objectives, constraints, constraint_vals = type(eval_function).evaluate(eval_function, cand)
+            gain = 0.0 if constraints else live_hv.contribution(np.array(objectives) / max_obj)
+            any_gain |= gain > 0
+            if gain > best_gain:
+                best, best_gain = cand, gain
+            if oracle == 'charged':
+                record(cand, objectives, constraints, constraint_vals)
+        oracle_info.append(any_gain)
+        child[:] = best
+
+    def component_mutation(offspring, ga_instance):
         for child in offspring:
-            for i in rng.choice(n_comp, size=k, replace=False):
-                child[5+5*i] = rng.choice(valid_panels(eval_function, child, i))
-                child[6+5*i] = des_space[6]['range'][rng.integers(101)]
-                child[7+5*i] = des_space[7]['range'][rng.integers(101)]
-                child[8+5*i] = rng.integers(6)
-                child[9+5*i] = des_space[9]['range'][rng.integers(36)]
+            if oracle:
+                oracle_move(child)
+            else:
+                mutate_components(child)
+        return offspring
+
+    actor = None
+    if params.get('ga_mutation') == 'actor':
+        # trained design repair actor as the mutation operator, like intelligent_mutation.py
+        import torch
+        from optimization.transformer_design_repair import Actor
+        from optimization.design_repair import encode_design, decode_action_to_value
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        actor = Actor(device=device, params=params, des_space=eval_function.unique_des_space,
+                      comp_list=eval_function.component_list, num_objectives=num_objectives).to(device)
+        actor.load_state_dict(torch.load(params['repair_actor_path'], map_location=device))
+        max_edits = params.get('actor_max_edits', 20)
+
+    def actor_mutation(offspring, ga_instance):
+        import torch
+        for child in offspring:
+            design = list(child)
+            for _ in range(max_edits):
+                obs = torch.tensor(encode_design(design, des_space), dtype=torch.float32, device=actor.device)
+                with torch.no_grad():
+                    _, var_idx, _, value_idx, _, stop = actor.sample_action(obs, des_space)
+                design[var_idx.item()] = decode_action_to_value(value_idx.item(), int(var_idx.item()), des_space)
+                if stop.item() == 1:
+                    break
+            child[:] = repair_invalid_panels(np.array(design, dtype=float))
         return offspring
 
     ga_kwargs = {}
@@ -101,6 +163,8 @@ def run_genetic_algorithm(max_obj, params, eval_function):
         ga_kwargs['initial_population'] = np.array(init, dtype=float)
     if params.get('ga_mutation') == 'component':
         ga_kwargs['mutation_type'] = component_mutation
+    elif params.get('ga_mutation') == 'actor':
+        ga_kwargs['mutation_type'] = actor_mutation
     else:
         ga_kwargs['mutation_type'] = 'random'
         if params.get('ga_mutation_num_genes') is not None:
@@ -151,6 +215,8 @@ def run_genetic_algorithm(max_obj, params, eval_function):
         #     print(f"Pareto front objectives:\n{hv_grid.paretoFrontPoint}" + \
         #           f"\nCorresponding designs:\n{hv_grid.paretoFrontSolution}")
     print(f"Total NFE: {NFE}")
+    if oracle_info:
+        params['oracle_info'] = float(np.mean(oracle_info))
 
     return all_des, all_obj, pareto_front_des, pareto_front_obj, hypervolumes, NFE
 
