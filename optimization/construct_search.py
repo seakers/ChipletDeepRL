@@ -11,7 +11,7 @@ def run_construct_search(max_obj, params, eval_function):
     num_objectives = eval_function.num_objectives
     all_des, all_obj, all_constraints = [], [], []
     # params['construct_num_structures'] = S draws every design's structure from a fixed pool of S
-    pool = []
+    pool = list(params.get('structure_pool') or [])
     while len(pool) < params.get('construct_num_structures', 0):
         x = construct_feasible(eval_function, rng)
         if x is not None:

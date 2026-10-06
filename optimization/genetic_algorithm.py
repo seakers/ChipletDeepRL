@@ -53,6 +53,11 @@ def run_genetic_algorithm(max_obj, params, eval_function):
     oracle = params.get('ga_oracle')  # None, 'free' or 'charged'
     live_hv = HypervolumeGrid(refPoint=[1.0]*num_objectives)  # archive the oracle scores against
     oracle_info = []
+    # params['structure_pool']: list of structures (genes 0-4) that constructed designs draw from
+    pool = params.get('structure_pool')
+
+    def construct():
+        return construct_feasible(eval_function, rng, structure=pool[rng.integers(len(pool))] if pool else None)
 
     def record(solution, objectives, constraints, constraint_vals):
         nonlocal NFE
@@ -140,7 +145,7 @@ def run_genetic_algorithm(max_obj, params, eval_function):
     def component_mutation(offspring, ga_instance):
         for child in offspring:
             if rng.random() < params.get('ga_immigrant_rate', 0.0):
-                x = construct_feasible(eval_function, rng)
+                x = construct()
                 if x is not None:
                     child[:] = x
                     continue
@@ -186,7 +191,7 @@ def run_genetic_algorithm(max_obj, params, eval_function):
     elif params.get('ga_init') == 'construct':
         init = []
         while len(init) < pop_size:
-            x = construct_feasible(eval_function, rng)
+            x = construct()
             if x is not None:
                 init.append(x)
         ga_kwargs['initial_population'] = np.array(init, dtype=float)
