@@ -1,12 +1,130 @@
 [
- {"name": "pool1", "method": "construct", "set": {"construct_num_structures": 1}},
- {"name": "pool4", "method": "construct", "set": {"construct_num_structures": 4}},
- {"name": "pool16", "method": "construct", "set": {"construct_num_structures": 16}},
- {"name": "pool64", "method": "construct", "set": {"construct_num_structures": 64}},
- {"name": "elit32", "method": "ga", "set": {"ga_mutation": "component", "ga_keep_elitism": 32, "ga_init": "construct", "ga_repair": true}},
- {"name": "elit32_immig_0.2", "method": "ga", "set": {"ga_mutation": "component", "ga_keep_elitism": 32, "ga_init": "construct", "ga_repair": true, "ga_immigrant_rate": 0.2}},
- {"name": "elit32_immig_0.2_struct_0.2", "method": "ga", "set": {"ga_mutation": "component", "ga_keep_elitism": 32, "ga_init": "construct", "ga_repair": true, "ga_immigrant_rate": 0.2, "ga_structure_mutation_rate": 0.2}},
- {"name": "local", "method": "ga", "set": {"ga_mutation": "component", "ga_keep_elitism": 8, "ga_init": "construct", "ga_repair": true, "ga_move": "local"}},
- {"name": "local_immig_0.2", "method": "ga", "set": {"ga_mutation": "component", "ga_keep_elitism": 8, "ga_init": "construct", "ga_repair": true, "ga_move": "local", "ga_immigrant_rate": 0.2}},
- {"name": "oracle_free_local", "method": "ga", "set": {"ga_mutation": "component", "ga_keep_elitism": 8, "ga_init": "construct", "ga_repair": true, "ga_move": "local", "ga_oracle": "free"}}
+ {
+  "name": "construct_only",
+  "method": "construct"
+ },
+ {
+  "name": "comp_construct_repair",
+  "method": "ga",
+  "set": {
+   "ga_mutation": "component",
+   "ga_keep_elitism": 8,
+   "ga_init": "construct",
+   "ga_repair": true
+  }
+ },
+ {
+  "name": "immig_0.2",
+  "method": "ga",
+  "set": {
+   "ga_mutation": "component",
+   "ga_keep_elitism": 8,
+   "ga_init": "construct",
+   "ga_repair": true,
+   "ga_immigrant_rate": 0.2
+  }
+ },
+ {
+  "name": "lab_repair",
+  "method": "ga",
+  "set": {
+   "ga_repair": true
+  }
+ },
+ {
+  "name": "pool1",
+  "method": "construct",
+  "set": {
+   "construct_num_structures": 1
+  }
+ },
+ {
+  "name": "pool4",
+  "method": "construct",
+  "set": {
+   "construct_num_structures": 4
+  }
+ },
+ {
+  "name": "pool16",
+  "method": "construct",
+  "set": {
+   "construct_num_structures": 16
+  }
+ },
+ {
+  "name": "pool64",
+  "method": "construct",
+  "set": {
+   "construct_num_structures": 64
+  }
+ },
+ {
+  "name": "elit32",
+  "method": "ga",
+  "set": {
+   "ga_mutation": "component",
+   "ga_keep_elitism": 32,
+   "ga_init": "construct",
+   "ga_repair": true
+  }
+ },
+ {
+  "name": "elit32_immig_0.2",
+  "method": "ga",
+  "set": {
+   "ga_mutation": "component",
+   "ga_keep_elitism": 32,
+   "ga_init": "construct",
+   "ga_repair": true,
+   "ga_immigrant_rate": 0.2
+  }
+ },
+ {
+  "name": "elit32_immig_0.2_struct_0.2",
+  "method": "ga",
+  "set": {
+   "ga_mutation": "component",
+   "ga_keep_elitism": 32,
+   "ga_init": "construct",
+   "ga_repair": true,
+   "ga_immigrant_rate": 0.2,
+   "ga_structure_mutation_rate": 0.2
+  }
+ },
+ {
+  "name": "local",
+  "method": "ga",
+  "set": {
+   "ga_mutation": "component",
+   "ga_keep_elitism": 8,
+   "ga_init": "construct",
+   "ga_repair": true,
+   "ga_move": "local"
+  }
+ },
+ {
+  "name": "local_immig_0.2",
+  "method": "ga",
+  "set": {
+   "ga_mutation": "component",
+   "ga_keep_elitism": 8,
+   "ga_init": "construct",
+   "ga_repair": true,
+   "ga_move": "local",
+   "ga_immigrant_rate": 0.2
+  }
+ },
+ {
+  "name": "oracle_free_local",
+  "method": "ga",
+  "set": {
+   "ga_mutation": "component",
+   "ga_keep_elitism": 8,
+   "ga_init": "construct",
+   "ga_repair": true,
+   "ga_move": "local",
+   "ga_oracle": "free"
+  }
+ }
 ]
