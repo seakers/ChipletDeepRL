@@ -3,7 +3,7 @@
 cd "$(dirname "$0")/.."
 while powershell -NoProfile -c "if (Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | Where-Object { \$_.CommandLine -like '*--tag cpu *' }) { exit 0 } else { exit 1 }"; do sleep 60; done
 export OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 PYTHONUNBUFFERED=1
-REF=experiments/reference/feasible.npy
+REF=experiments/reference/random_1.5.npy
 run() { # tag arms budget nshards
   for k in $(seq 0 $(($4 - 1))); do
     .venv/Scripts/python.exe experiments/runner.py --tag $1 --arms experiments/arms/$2 --seeds 0-3 --budget $3 \

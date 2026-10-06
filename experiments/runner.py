@@ -138,6 +138,24 @@ def true_front(all_obj, max_values, all_des=None):
     return front.tolist(), structs
 
 
+def raw_front(all_obj, max_values, all_des=None):
+    # nondominated raw objectives over every feasible design, so HV can be recomputed for any reference
+    if max_values is None:
+        return [], []
+    obj = np.asarray(all_obj, dtype=float)
+    keep = ~np.all(np.isclose(obj, max_values), axis=1) & np.all(obj >= 0, axis=1)  # infeasible are stored at max_values
+    if not keep.any():
+        return [], []
+    idx = np.nonzero(keep)[0]
+    idx = idx[is_pareto_efficient(obj[idx])]
+    _, first = np.unique(obj[idx], axis=0, return_index=True)
+    idx = idx[first]
+    structs = []
+    if all_des is not None and len(all_des) == len(obj):
+        structs = [[round(float(v), 4) for v in np.asarray(all_des[k], dtype=float)[:5]] for k in idx]
+    return [[float(f'{v:.6g}') for v in obj[k]] for k in idx], structs
+
+
 def run_job(job, args, overrides, max_values):
     fn, needs_ref, _ = _methods()[job['method']]
     set_seed(job['seed'])
@@ -188,6 +206,7 @@ def run_job(job, args, overrides, max_values):
     pareto_front_obj = out[3]
     front = pareto_front_obj[-1] if len(pareto_front_obj) else []
     true_obj, true_structs = true_front(out[1], max_values, out[0])
+    raw_obj, raw_structs = raw_front(out[1], max_values, out[0])
     return {
         'final_hv': float(hypervolumes[-1]) if hypervolumes else 0.0,
         'nfe': int(out[5]),
@@ -195,6 +214,8 @@ def run_job(job, args, overrides, max_values):
         # true nondominated set of all feasible designs, normalized, for checking the HV metric
         'front': true_obj,
         'front_struct': true_structs,
+        'front_raw': raw_obj,
+        'front_raw_struct': raw_structs,
         'n_feasible': int(len(violated) - sum(violated)),
         'first_feasible_nfe': next((k + 1 for k, v in enumerate(violated) if not v), None),
         'hv_curve': checkpoints(hypervolumes),

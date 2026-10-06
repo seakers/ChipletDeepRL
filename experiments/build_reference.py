@@ -1,8 +1,8 @@
 """
 Builds a fixed max_values reference.
 
---mode random: 3x the max of each objective over seeded random designs, the same rule as
-random_search.py. Almost no random design is feasible, so this mostly measures overlapping designs.
+--mode random: --factor (default 3, the rule in random_search.py; the IDETC paper uses 1.5)
+times the max of each objective over seeded random designs, feasible or not. Almost no random design is feasible, so this mostly measures overlapping designs.
 --mode feasible: 1.1x the max over designs from utils.construct.construct_feasible, which
 are all feasible.
 
@@ -31,6 +31,7 @@ def main():
     ap.add_argument('--n', type=int, default=16000, help='random designs to sample')
     ap.add_argument('--seed', type=int, default=0)
     ap.add_argument('--mode', choices=['random', 'feasible'], default='random')
+    ap.add_argument('--factor', type=float, default=3.0, help='random mode: multiple of the max')
     ap.add_argument('--out', default='experiments/reference/provisional.npy')
     args = ap.parse_args()
 
@@ -55,9 +56,10 @@ def main():
         return
 
     components, _ = getComponents()
-    eval_function = Chiplet_Configuration_Design(components, StructPanel())
+    eval_function = FastChipletDesign(components, StructPanel())
     params = {'num_epochs': args.n // 64, 'mini_batch_size': 64, 'seed': args.seed}
     *_, max_values = run_random_search(params, eval_function)
+    max_values = max_values / 3.0 * args.factor  # run_random_search returns 3x the max
 
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
     np.save(args.out, max_values)
