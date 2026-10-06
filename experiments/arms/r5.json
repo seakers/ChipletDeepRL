@@ -1,0 +1,36 @@
+[
+ {
+  "name": "restart4",
+  "method": "ga",
+  "set": {
+   "ga_mutation": "component",
+   "ga_keep_elitism": 8,
+   "ga_init": "construct",
+   "ga_repair": true,
+   "ga_restarts": 4
+  }
+ },
+ {
+  "name": "greedy_init",
+  "method": "ga",
+  "set": {
+   "ga_mutation": "component",
+   "ga_keep_elitism": 8,
+   "ga_init": "construct",
+   "ga_repair": true,
+   "ga_greedy_m": 4
+  }
+ },
+ {
+  "name": "greedy_immig_0.2",
+  "method": "ga",
+  "set": {
+   "ga_mutation": "component",
+   "ga_keep_elitism": 8,
+   "ga_init": "construct",
+   "ga_repair": true,
+   "ga_greedy_m": 4,
+   "ga_immigrant_rate": 0.2
+  }
+ }
+]

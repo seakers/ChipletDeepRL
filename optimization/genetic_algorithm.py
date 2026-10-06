@@ -2,7 +2,7 @@ import numpy as np
 import pygad
 
 from utils.hypervolume_utils import HypervolumeGrid, MonteCarloArchive
-from utils.construct import construct_feasible, repair_overlaps, valid_panels
+from utils.construct import construct_feasible, construct_greedy, repair_overlaps, valid_panels
 
 
 def run_genetic_algorithm(max_obj, params, eval_function):
@@ -60,7 +60,11 @@ def run_genetic_algorithm(max_obj, params, eval_function):
     pool = params.get('structure_pool')
 
     def construct():
-        return construct_feasible(eval_function, rng, structure=pool[rng.integers(len(pool))] if pool else None)
+        structure = pool[rng.integers(len(pool))] if pool else None
+        if params.get('ga_greedy_m'):
+            # objective-aware constructor for the initial population and immigrants
+            return construct_greedy(eval_function, rng, max_obj, m=params['ga_greedy_m'], structure=structure)
+        return construct_feasible(eval_function, rng, structure=structure)
 
     def record(solution, objectives, constraints, constraint_vals):
         nonlocal NFE
@@ -94,7 +98,7 @@ def run_genetic_algorithm(max_obj, params, eval_function):
     def on_generation(ga_instance):
         if ga_instance.generations_completed % 10 == 0:
             print(f"Generation {ga_instance.generations_completed}")
-        if nfe_budget is not None and NFE >= nfe_budget:
+        if nfe_budget is not None and NFE >= stop_at:
             return "stop"
 
     def mutate_components(child):
@@ -191,46 +195,50 @@ def run_genetic_algorithm(max_obj, params, eval_function):
             child[:] = repair_invalid_panels(np.array(design, dtype=float))
         return offspring
 
-    ga_kwargs = {}
-    if params.get('ga_init') == 'file':
-        # final population saved by an earlier run, e.g. on a different manifest
-        init = np.load(params['ga_init_path'].format(seed=params.get('seed')))
-        ga_kwargs['initial_population'] = init[:pop_size]
-    elif params.get('ga_init') == 'construct':
-        init = []
-        while len(init) < pop_size:
-            x = construct()
-            if x is not None:
-                init.append(x)
-        ga_kwargs['initial_population'] = np.array(init, dtype=float)
-    if params.get('ga_mutation') == 'component':
-        ga_kwargs['mutation_type'] = component_mutation
-    elif params.get('ga_mutation') == 'actor':
-        ga_kwargs['mutation_type'] = actor_mutation
-    else:
-        ga_kwargs['mutation_type'] = 'random'
-        if params.get('ga_mutation_num_genes') is not None:
-            ga_kwargs['mutation_num_genes'] = params['ga_mutation_num_genes']
+    # params['ga_restarts'] = K splits the budget into K GA runs, each from a fresh initial population
+    restarts = params.get('ga_restarts', 1)
+    for stage in range(restarts):
+        stop_at = nfe_budget * (stage + 1) / restarts if nfe_budget is not None else None
+        ga_kwargs = {}
+        if params.get('ga_init') == 'file':
+            # final population saved by an earlier run, e.g. on a different manifest
+            init = np.load(params['ga_init_path'].format(seed=params.get('seed')))
+            ga_kwargs['initial_population'] = init[:pop_size]
+        elif params.get('ga_init') == 'construct':
+            init = []
+            while len(init) < pop_size:
+                x = construct()
+                if x is not None:
+                    init.append(x)
+            ga_kwargs['initial_population'] = np.array(init, dtype=float)
+        if params.get('ga_mutation') == 'component':
+            ga_kwargs['mutation_type'] = component_mutation
+        elif params.get('ga_mutation') == 'actor':
+            ga_kwargs['mutation_type'] = actor_mutation
         else:
-            ga_kwargs['mutation_probability'] = params.get('ga_mutation_probability', 0.1)
-    if params.get('ga_keep_elitism') is not None:
-        ga_kwargs['keep_elitism'] = params['ga_keep_elitism']
-    if params.get('seed') is not None:
-        ga_kwargs['random_seed'] = params['seed']
+            ga_kwargs['mutation_type'] = 'random'
+            if params.get('ga_mutation_num_genes') is not None:
+                ga_kwargs['mutation_num_genes'] = params['ga_mutation_num_genes']
+            else:
+                ga_kwargs['mutation_probability'] = params.get('ga_mutation_probability', 0.1)
+        if params.get('ga_keep_elitism') is not None:
+            ga_kwargs['keep_elitism'] = params['ga_keep_elitism']
+        if params.get('seed') is not None:
+            ga_kwargs['random_seed'] = params['seed'] + 1000 * stage
 
-    # Create the GA instance
-    ga_instance = pygad.GA(num_generations=n_gen if nfe_budget is None else 10**6,
-                           num_parents_mating=int(pop_size/4),
-                           fitness_func=fitness_func,
-                           sol_per_pop=pop_size,
-                           num_genes=len(des_space),
-                           gene_space=gene_space,
-                           parent_selection_type=params.get('ga_parent_selection', "nsga2"),
-                           on_generation=on_generation,
-                           **ga_kwargs)
+        # Create the GA instance
+        ga_instance = pygad.GA(num_generations=n_gen if nfe_budget is None else 10**6,
+                               num_parents_mating=int(pop_size/4),
+                               fitness_func=fitness_func,
+                               sol_per_pop=pop_size,
+                               num_genes=len(des_space),
+                               gene_space=gene_space,
+                               parent_selection_type=params.get('ga_parent_selection', "nsga2"),
+                               on_generation=on_generation,
+                               **ga_kwargs)
 
-    # Run the GA
-    ga_instance.run()
+        # Run the GA
+        ga_instance.run()
 
     all_des = np.array(all_des)
     all_obj = np.array(all_obj)
