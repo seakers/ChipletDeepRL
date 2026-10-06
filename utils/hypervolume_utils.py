@@ -108,3 +108,36 @@ class HypervolumeGrid:
 
     def getHV(self):
         return np.sum(self.dominated)/self.numPoints * self.HVMax
+
+class MonteCarloArchive:
+    """
+    Nondominated archive in normalized objectives (reference point at 1) with a Monte Carlo HV.
+    contribution() estimates the HV a point would add; improves() is exact: the point is inside
+    the reference box and not weakly dominated by the archive.
+    """
+    def __init__(self, num_objectives, n=20000, seed=0):
+        self.U = np.random.default_rng(seed).random((n, num_objectives))
+        self.covered = np.zeros(n, dtype=bool)
+        self.points = np.zeros((0, num_objectives))
+
+    def improves(self, p):
+        p = np.asarray(p, dtype=float)
+        if np.any(p >= 1.0):
+            return False
+        return not np.any(np.all(self.points <= p, axis=1))
+
+    def contribution(self, p):
+        p = np.asarray(p, dtype=float)
+        if np.any(p >= 1.0):
+            return 0.0
+        return float(np.mean(~self.covered & np.all(self.U >= p, axis=1)))
+
+    def update(self, p):
+        p = np.asarray(p, dtype=float)
+        if not self.improves(p):
+            return
+        self.covered |= np.all(self.U >= p, axis=1)
+        self.points = np.vstack([self.points[~np.all(self.points >= p, axis=1)], p])
+
+    def hv(self):
+        return float(self.covered.mean())

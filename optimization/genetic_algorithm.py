@@ -1,7 +1,7 @@
 import numpy as np
 import pygad
 
-from utils.hypervolume_utils import HypervolumeGrid
+from utils.hypervolume_utils import HypervolumeGrid, MonteCarloArchive
 from utils.construct import construct_feasible, repair_overlaps, valid_panels
 
 
@@ -51,7 +51,10 @@ def run_genetic_algorithm(max_obj, params, eval_function):
     rng = np.random.default_rng(params.get('seed'))
     nfe_budget = params.get('nfe_budget')
     oracle = params.get('ga_oracle')  # None, 'free' or 'charged'
-    live_hv = HypervolumeGrid(refPoint=[1.0]*num_objectives)  # archive the oracle scores against
+    # archive the oracle scores against: the HV grid, or 'mc' for a Monte Carlo HV (the grid is too
+    # coarse on a loose reference point to see most improvements)
+    mc = params.get('ga_oracle_metric') == 'mc'
+    live_hv = MonteCarloArchive(num_objectives) if mc else HypervolumeGrid(refPoint=[1.0]*num_objectives)
     oracle_info = []
     # params['structure_pool']: list of structures (genes 0-4) that constructed designs draw from
     pool = params.get('structure_pool')
@@ -67,7 +70,10 @@ def run_genetic_algorithm(max_obj, params, eval_function):
         all_constraint_vals.append(constraint_vals)
         NFE += 1
         if not constraints:
-            live_hv.updateHV(np.array(objectives) / max_obj, np.array(solution))
+            if mc:
+                live_hv.update(np.array(objectives) / max_obj)
+            else:
+                live_hv.updateHV(np.array(objectives) / max_obj, np.array(solution))
 
     def fitness_func(ga_instance, solution, solution_idx):
         # print(f"Evaluating solution {solution}")
@@ -125,6 +131,8 @@ def run_genetic_algorithm(max_obj, params, eval_function):
             else:
                 objectives, constraints, constraint_vals = type(eval_function).evaluate(eval_function, cand)
             gain = 0.0 if constraints else live_hv.contribution(np.array(objectives) / max_obj)
+            if mc and not constraints and live_hv.improves(np.array(objectives) / max_obj):
+                gain = max(gain, 1e-12)  # nondominated but below the Monte Carlo resolution
             any_gain |= gain > 0
             if gain > best_gain:
                 best, best_gain = cand, gain

@@ -1,0 +1,27 @@
+[
+ {
+  "name": "oracle_free_mc",
+  "method": "ga",
+  "set": {
+   "ga_mutation": "component",
+   "ga_keep_elitism": 8,
+   "ga_init": "construct",
+   "ga_repair": true,
+   "ga_oracle": "free",
+   "ga_oracle_metric": "mc"
+  }
+ },
+ {
+  "name": "oracle_free_local_mc",
+  "method": "ga",
+  "set": {
+   "ga_mutation": "component",
+   "ga_keep_elitism": 8,
+   "ga_init": "construct",
+   "ga_repair": true,
+   "ga_oracle": "free",
+   "ga_oracle_metric": "mc",
+   "ga_move": "local"
+  }
+ }
+]

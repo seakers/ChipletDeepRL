@@ -207,6 +207,10 @@ def run_job(job, args, overrides, max_values):
     front = pareto_front_obj[-1] if len(pareto_front_obj) else []
     true_obj, true_structs = true_front(out[1], max_values, out[0])
     raw_obj, raw_structs = raw_front(out[1], max_values, out[0])
+    # raw fronts of the first n evaluations, for exact HV over the run (the grid curve is coarse)
+    n_all = len(out[1])
+    raw_curve = {n: raw_front(out[1][:n], max_values)[0]
+                 for n in (500, 1000, 2000, 4000, 8000, 16000, 32000) if n < n_all}
     return {
         'final_hv': float(hypervolumes[-1]) if hypervolumes else 0.0,
         'nfe': int(out[5]),
@@ -216,6 +220,7 @@ def run_job(job, args, overrides, max_values):
         'front_struct': true_structs,
         'front_raw': raw_obj,
         'front_raw_struct': raw_structs,
+        'front_raw_curve': raw_curve,
         'n_feasible': int(len(violated) - sum(violated)),
         'first_feasible_nfe': next((k + 1 for k, v in enumerate(violated) if not v), None),
         'hv_curve': checkpoints(hypervolumes),
