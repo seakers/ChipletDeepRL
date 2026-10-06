@@ -89,6 +89,15 @@ def run_genetic_algorithm(max_obj, params, eval_function):
     def mutate_components(child):
         # re-sample all 5 genes of a few components instead of single genes
         k = params.get('ga_components_per_mutation', 1)
+        if params.get('ga_move') == 'local':
+            # shift a component's position on its panel by a few grid steps instead
+            step = params.get('ga_local_step', 5)
+            for i in rng.choice(eval_function.num_components, size=k, replace=False):
+                for g in (6, 7):
+                    r = np.asarray(des_space[g]['range'])
+                    j = int(np.argmin(np.abs(r - child[g+5*i]))) + int(np.round(rng.normal(0, step)))
+                    child[g+5*i] = r[min(max(j, 0), len(r) - 1)]
+            return
         for i in rng.choice(eval_function.num_components, size=k, replace=False):
             child[5+5*i] = rng.choice(valid_panels(eval_function, child, i))
             child[6+5*i] = des_space[6]['range'][rng.integers(101)]

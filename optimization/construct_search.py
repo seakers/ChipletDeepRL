@@ -1,7 +1,7 @@
 import numpy as np
 
 from utils.hypervolume_utils import HypervolumeGrid
-from utils.construct import construct_feasible
+from utils.construct import construct_feasible, construct_greedy
 
 
 def run_construct_search(max_obj, params, eval_function):
@@ -10,8 +10,19 @@ def run_construct_search(max_obj, params, eval_function):
     budget = params.get('nfe_budget') or params['num_epochs'] * params['mini_batch_size']
     num_objectives = eval_function.num_objectives
     all_des, all_obj, all_constraints = [], [], []
-    while len(all_obj) < budget:
+    # params['construct_num_structures'] = S draws every design's structure from a fixed pool of S
+    pool = []
+    while len(pool) < params.get('construct_num_structures', 0):
         x = construct_feasible(eval_function, rng)
+        if x is not None:
+            pool.append(x[:5])
+    while len(all_obj) < budget:
+        structure = pool[rng.integers(len(pool))] if pool else None
+        if params.get('construct_greedy_m'):
+            # objective-aware placement; its partial cost checks are not counted as evaluations
+            x = construct_greedy(eval_function, rng, max_obj, m=params['construct_greedy_m'], structure=structure)
+        else:
+            x = construct_feasible(eval_function, rng, structure=structure)
         if x is None:
             continue
         objectives, violated, _ = eval_function.evaluate(x)

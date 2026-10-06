@@ -10,6 +10,7 @@ stopped and restarted.
 """
 import argparse
 import datetime
+import glob
 import json
 import os
 import random
@@ -120,16 +121,21 @@ def checkpoints(hypervolumes, n=20):
     return [[int(i) + 1, float(hypervolumes[i])] for i in idx]
 
 
-def true_front(all_obj, max_values):
+def true_front(all_obj, max_values, all_des=None):
+    # returns (front objectives, structure genes 0-4 of the front designs)
     if max_values is None:
-        return []
+        return [], []
     obj = np.asarray(all_obj, dtype=float) / max_values
-    obj = obj[~np.all(np.isclose(obj, 1.0), axis=1)]  # infeasible designs are stored at max_values
-    obj = obj[np.all(obj < 1.0, axis=1)]
-    if len(obj) == 0:
-        return []
-    front = obj[is_pareto_efficient(obj)]
-    return np.round(np.unique(front, axis=0), 6).tolist()
+    keep = ~np.all(np.isclose(obj, 1.0), axis=1) & np.all(obj < 1.0, axis=1)  # infeasible are stored at max_values
+    if not keep.any():
+        return [], []
+    idx = np.nonzero(keep)[0]
+    idx = idx[is_pareto_efficient(obj[idx])]
+    front, first = np.unique(np.round(obj[idx], 6), axis=0, return_index=True)
+    structs = []
+    if all_des is not None and len(all_des) == len(obj):
+        structs = [[round(float(v), 4) for v in np.asarray(all_des[idx[k]], dtype=float)[:5]] for k in first]
+    return front.tolist(), structs
 
 
 def run_job(job, args, overrides, max_values):
@@ -181,12 +187,14 @@ def run_job(job, args, overrides, max_values):
     hypervolumes = list(out[4])
     pareto_front_obj = out[3]
     front = pareto_front_obj[-1] if len(pareto_front_obj) else []
+    true_obj, true_structs = true_front(out[1], max_values, out[0])
     return {
         'final_hv': float(hypervolumes[-1]) if hypervolumes else 0.0,
         'nfe': int(out[5]),
         'front_size': int(len(front)),
         # true nondominated set of all feasible designs, normalized, for checking the HV metric
-        'front': true_front(out[1], max_values),
+        'front': true_obj,
+        'front_struct': true_structs,
         'n_feasible': int(len(violated) - sum(violated)),
         'first_feasible_nfe': next((k + 1 for k, v in enumerate(violated) if not v), None),
         'hv_curve': checkpoints(hypervolumes),
@@ -233,15 +241,20 @@ def main():
 
     out_path = os.path.join(ROOT, 'experiments', 'data', f'{args.tag}_shard_{args.shard}.jsonl')
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    done = set()
-    if os.path.exists(out_path):
-        with open(out_path) as f:
-            done = {json.loads(line)['job_id'] for line in f if line.strip()}
+    def finished():
+        # jobs done in any shard file of this tag, so changing --nshards does not rerun them
+        ids = set()
+        for path in glob.glob(os.path.join(ROOT, 'experiments', 'data', f'{args.tag}_shard_*.jsonl')):
+            with open(path) as f:
+                ids |= {r['job_id'] for r in map(json.loads, filter(str.strip, f)) if 'error' not in r}
+        return ids
 
     commit = git_commit()
-    todo = [j for j in mine if j['job_id'] not in done]
+    todo = [j for j in mine if j['job_id'] not in finished()]
     print(f'[runner] shard {args.shard}/{args.nshards}: {len(todo)} to run, {len(mine) - len(todo)} already done')
     for job in todo:
+        if job['job_id'] in finished():
+            continue
         print(f"[runner] {job['job_id']}", flush=True)
         record = dict(job, tag=args.tag, budget=args.budget, ref=args.ref, commit=commit,
                       overrides=overrides, device='cuda' if torch.cuda.is_available() else 'cpu',

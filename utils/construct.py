@@ -111,3 +111,61 @@ def repair_overlaps(ev, x, rng, tries=20):
             new = ev.component_boxes(int(i))
         placed = stack(placed, new)
     return x
+
+
+def partial_costs(ev, placed_idx):
+    """cm, off-axis inertia, on-axis inertia and wire cost of the components placed so far.
+    Thermal is left out: it depends only on the shell area."""
+    comps = [ev.component_list[k] for k in placed_idx]
+    struct = [p for p in ev.structure_panels if p is not None]
+    dims = [c.dimensions for c in comps]
+    locs = [c.location for c in comps]
+    orients = [c.orientation for c in comps]
+    masses = [c.mass for c in comps]
+    cm = ev.center_mass_cost(locs, masses, [p.location for p in struct], [p.mass for p in struct])
+    off, on = ev.inertia_cost(dims + [p.dimensions for p in struct], locs + [p.location for p in struct],
+                              masses + [p.mass for p in struct], orients + [p.orientation for p in struct],
+                              [None] * len(comps) + [p.polygon for p in struct])
+    types = [c.type for c in comps]
+    wire = ev.wire_cost(dims, locs, types, orients) if 'PCU' in types else 0.0
+    return np.array([cm, off, on, wire])
+
+
+def construct_greedy(ev, rng, max_obj, m=4, tries=500, max_structures=20, structure=None):
+    """
+    Like construct_feasible, but each component gets m clear candidate placements and keeps the one
+    with the lowest weighted sum of partial_costs (random weights per design). The PCU goes first
+    so the wire cost is defined from the start.
+    """
+    scale = np.asarray(max_obj[:4], dtype=float)
+    for _ in range(max_structures):
+        if structure is None:
+            s = [int(rng.integers(3)), rng.uniform(0.3, 2.0), rng.uniform(0.3, 2.0),
+                 rng.uniform(0.3, 2.0), int(rng.integers(ev.max_shelves + 1))]
+        else:
+            s = list(structure)
+        x = s + [0] * (5 * ev.num_components)
+        ev.get_structural_panels(x)
+        w = rng.dirichlet(np.ones(4))
+        pcu = [k for k, c in enumerate(ev.component_list) if c.type == 'PCU']
+        order = pcu + [int(k) for k in rng.permutation(ev.num_components) if k not in pcu]
+        placed, done, ok = EMPTY, [], True
+        for i in order:
+            best = None
+            for _ in range(m):
+                new = place_clear(ev, x, i, placed, rng, tries)
+                if new is None:
+                    break
+                score = w @ (partial_costs(ev, done + [i]) / scale)
+                if best is None or score < best[0]:
+                    best = (score, list(x[5 + 5 * i:10 + 5 * i]), new)
+            if best is None:
+                ok = False
+                break
+            x[5 + 5 * i:10 + 5 * i] = best[1]
+            ev.place_component(i, x)
+            placed = stack(placed, best[2])
+            done.append(i)
+        if ok:
+            return x
+    return None
