@@ -285,13 +285,14 @@ def main():
         print(f"[runner] {job['job_id']}", flush=True)
         record = dict(job, tag=args.tag, budget=args.budget, ref=args.ref, commit=commit,
                       overrides=overrides, device='cuda' if torch.cuda.is_available() else 'cpu',
-                      finished=datetime.datetime.now().isoformat(timespec='seconds'))
+                      started=datetime.datetime.now().isoformat(timespec='seconds'))
         try:
             record.update(run_job(job, args, overrides, max_values))
         except Exception:
             # delete the line from the shard file to retry
             record['error'] = traceback.format_exc()
             print(record['error'], file=sys.stderr)
+        record['finished'] = datetime.datetime.now().isoformat(timespec='seconds')
         with open(out_path, 'a') as f:
             f.write(json.dumps(record) + '\n')
 
