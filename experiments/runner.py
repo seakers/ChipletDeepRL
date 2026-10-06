@@ -242,6 +242,7 @@ def main():
     ap.add_argument('--gpu-memory-fraction', type=float, default=1.0, help='cap on GPU memory per process')
     ap.add_argument('--shard', type=int, default=0)
     ap.add_argument('--nshards', type=int, default=1)
+    ap.add_argument('--shard-label', help='output file suffix instead of the shard number, for extra workers')
     args = ap.parse_args()
 
     if args.arms:
@@ -265,7 +266,7 @@ def main():
             for a in arms for s in parse_seeds(args.seeds)]
     mine = [j for i, j in enumerate(jobs) if i % args.nshards == args.shard]
 
-    out_path = os.path.join(ROOT, 'experiments', 'data', f'{args.tag}_shard_{args.shard}.jsonl')
+    out_path = os.path.join(ROOT, 'experiments', 'data', f'{args.tag}_shard_{args.shard_label or args.shard}.jsonl')
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     def finished():
         # jobs done in any shard file of this tag, so changing --nshards does not rerun them
