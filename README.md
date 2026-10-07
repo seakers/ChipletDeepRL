@@ -41,11 +41,12 @@ design repair PPO    0.084 -0.007  0.084     0 0 0
   `main.py` sets it to `None`.
 - The unused transformer variants (`hv`, `hv_informed`, `informed_attn`, `multi`, `random`)
   still have the old bugs.
-- In `evaluation.py` the pointing keep-out rods and wire ports are offset with the wrong
-  dimension unless the component points along world x, so most pointing placements overlap
-  their own rod. `fix_face_offsets=True` fixes it; it is off by default.
-- No random design out of 16,000 was feasible, so a max_values built from random designs
-  only describes infeasible ones. `experiments/reference/feasible.npy` is built from
-  constructed feasible designs instead.
+- No random design is feasible on the current code, so a max_values built from random designs
+  only describes infeasible ones. The experiments use the IDETC rule anyway
+  (`experiments/reference/random_1.5.npy`); `feasible.npy` (constructed designs) was round 1 only.
+- The overlap test before ab59dbe (Aug 6 2026) missed overlaps between boxes with parallel edges,
+  so results from that code (including random-search feasibility) are not comparable with the
+  current code. See `experiments/probes/`.
+- `thermal_cost` depends only on the shell area, so component layout cannot change it.
 
 Results of the October experiments are in `experiments/RESULTS.md`.
