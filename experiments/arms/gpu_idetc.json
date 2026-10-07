@@ -1,0 +1,23 @@
+[
+ {
+  "name": "ppo_repair_idetc",
+  "method": "ppo",
+  "set": {
+   "ppo_repair": true,
+   "learning_rate": 0.0003,
+   "clip_ratio": 0.05,
+   "lambda": 0.9,
+   "mini_batch_size": 16
+  }
+ },
+ {
+  "name": "ppo_idetc",
+  "method": "ppo",
+  "set": {
+   "learning_rate": 0.0003,
+   "clip_ratio": 0.05,
+   "lambda": 0.9,
+   "mini_batch_size": 16
+  }
+ }
+]

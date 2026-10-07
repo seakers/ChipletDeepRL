@@ -273,3 +273,27 @@ def create_varied_components(num_sets=10, variation_pct=0.3):
     #         Component(type="accelerometer", mass=1.8, dimensions=[0.13, 0.11, 0.09], heatDisp=2.3, pointing=False),
     #     ]
     # ]
+
+
+def getSciTechComponents():
+    # the 18-component list from commit c147c02 (Aug 2025), the SciTech 2026 paper's era
+    return [
+        Component(type="battery", mass=8, dimensions=[.25,.2,.15], heatDisp=2, pointing=False),
+        Component(type="reaction wheel", mass=2, dimensions=[.075,.240,.240], heatDisp=2, pointing=False),
+        Component(type="reaction wheel", mass=2, dimensions=[.075,.240,.240], heatDisp=2, pointing=False),
+        Component(type="reaction wheel", mass=2, dimensions=[.075,.240,.240], heatDisp=2, pointing=False),
+        Component(type="gyro", mass=3, dimensions=[.1876,.1239,.0015], heatDisp=2.5, pointing=False),
+        Component(type="gyro", mass=3, dimensions=[.1876,.1239,.0015], heatDisp=2.5, pointing=False),
+        Component(type="transmitter", mass=4.5, dimensions=[.25,.15,.05], heatDisp=12, pointing=True),
+        Component(type="transmitter", mass=3.5, dimensions=[.2,.1,.05], heatDisp=10, pointing=True),
+        Component(type="receiver", mass=4, dimensions=[.2,.15,.03], heatDisp=11, pointing=True),
+        Component(type="receiver", mass=3, dimensions=[.175,.125,.03], heatDisp=9, pointing=True),
+        Component(type="PCU", mass=7, dimensions=[.3,.2,.15], heatDisp=7, pointing=False),
+        Component(type="OBDH", mass=9, dimensions=[.24,.18,.18], heatDisp=6, pointing=False),
+        Component(type="magnetometer", mass=1.5, dimensions=[.15,.12,.04], heatDisp=1.5, pointing=False),
+        Component(type="magnetometer", mass=1.5, dimensions=[.15,.12,.04], heatDisp=1.5, pointing=False),
+        Component(type="magnetometer", mass=1.5, dimensions=[.15,.12,.04], heatDisp=1.5, pointing=False),
+        Component(type="payload", mass=5, dimensions=[.3,.25,.2], heatDisp=3, pointing=True),
+        Component(type="solar panel", mass=1.5, dimensions=[.3,.5,.01], heatDisp=1.5, pointing=True),
+        Component(type="solar panel", mass=1.5, dimensions=[.3,.5,.01], heatDisp=1.5, pointing=True),
+    ]

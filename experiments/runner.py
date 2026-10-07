@@ -27,7 +27,7 @@ os.chdir(ROOT)  # methods save to results/<date_str>/
 import numpy as np
 import torch
 
-from utils.component_list import getComponents, create_varied_components
+from utils.component_list import getComponents, create_varied_components, getSciTechComponents
 from utils.component_classes import StructPanel
 from utils.fast_evaluation import FastChipletDesign
 from utils.hypervolume_utils import is_pareto_efficient
@@ -180,7 +180,9 @@ def run_job(job, args, overrides, max_values):
                 shutil.copy2(src, os.path.join(work, name))
         params['model_folder'] = args.actors
 
-    if params.get('manifest_seed') is not None:
+    if params.get('manifest') == 'scitech18':
+        components = getSciTechComponents()
+    elif params.get('manifest_seed') is not None:
         # a varied manifest: same component types, masses and sizes within +-30%
         random.seed(params['manifest_seed'])
         components = create_varied_components(num_sets=1)[0]
