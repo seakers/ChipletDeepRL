@@ -192,11 +192,13 @@ def run_job(job, args, overrides, max_values):
     # same results as Chiplet_Configuration_Design, faster overlap checks
     eval_function = FastChipletDesign(components, StructPanel())
     violated = []
+    call_times = []
     evaluate = eval_function.evaluate
 
     def counting_evaluate(x):
         out = evaluate(x)
         violated.append(bool(out[1]))
+        call_times.append(time.time() - t0)
         return out
     eval_function.evaluate = counting_evaluate
 
@@ -223,6 +225,8 @@ def run_job(job, args, overrides, max_values):
         'front_raw': raw_obj,
         'front_raw_struct': raw_structs,
         'front_raw_curve': raw_curve,
+        # seconds since start at the n-th evaluate call (same as the raw curve's n unless an oracle's lookahead is free)
+        'curve_time': {n: round(call_times[n - 1], 1) for n in raw_curve if n <= len(call_times)},
         'n_feasible': int(len(violated) - sum(violated)),
         'first_feasible_nfe': next((k + 1 for k, v in enumerate(violated) if not v), None),
         'hv_curve': checkpoints(hypervolumes),
