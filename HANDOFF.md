@@ -172,3 +172,20 @@ to-do list; this file has the context, the rules, and the mistakes not to repeat
   components already placed, so every design is feasible and PPO only learns objectives.
   `greedy4` is the non-learned version and the bar to beat.
 - The full list of 14 questions for Alex is in the doc; the email has the top 5.
+
+## Oct 7 update
+
+- Results are in `experiments/RESULTS.md` and the doc. Main ones: the overlap test before ab59dbe
+  missed overlaps between boxes with parallel edges (`experiments/probes/`), which explains the
+  papers' feasible random designs and RL results; PPO with the IDETC settings does no better
+  (`gpu_idetc`); structure transfer works through size and type (`r7_transfer_ctrl`,
+  `r9_volume`); per minute, structure mutation is the best method (`r8_time`, `r10_long`);
+  a size cap (`structure_dim_max`, `r11_dimmax`) does not help the GAs.
+- The PC enters Modern Standby when the screen turns off and suspends every runner. Before
+  leaving runs unattended, start a keep-awake loop (PowerShell `SetThreadExecutionState`
+  0x80000003 while any `runner.py` process exists). Check progress by process CPU time.
+- Construction on small shells is several times slower: `construct_only_dim1.2` took ~6 h per
+  run. Estimate construct-based arms from similar compact runs, not from `construct_only`.
+- Records now keep `curve_time` (seconds at each raw-curve checkpoint).
+- Nothing is running. No experiments are queued; the GPU ideas left are option 2 (Oliver's)
+  and the warm start (Oliver said not now).
