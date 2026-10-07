@@ -43,7 +43,13 @@ def stack(a, b):
 EMPTY = (np.zeros((0, 3)), np.zeros((0, 3)), np.zeros((0, 3, 3)))
 
 
-def construct_feasible(ev, rng, structure=None, tries=500, max_structures=20):
+def random_structure(ev, rng, dim_max=2.0):
+    # shell shape, x/y/z size (m), shelf count
+    return [int(rng.integers(3)), rng.uniform(0.3, dim_max), rng.uniform(0.3, dim_max),
+            rng.uniform(0.3, dim_max), int(rng.integers(ev.max_shelves + 1))]
+
+
+def construct_feasible(ev, rng, structure=None, tries=500, max_structures=20, dim_max=2.0):
     """
     Build a feasible design by placing components one at a time in random order,
     rejecting placements that overlap. Random structure unless one is given.
@@ -52,8 +58,7 @@ def construct_feasible(ev, rng, structure=None, tries=500, max_structures=20):
     for _ in range(max_structures):
         if structure is None:
             ds = ev.design_space
-            s = [int(rng.integers(3)), rng.uniform(0.3, 2.0), rng.uniform(0.3, 2.0),
-                 rng.uniform(0.3, 2.0), int(rng.integers(ev.max_shelves + 1))]
+            s = random_structure(ev, rng, dim_max)
         else:
             s = list(structure)
         x = s + [0] * (5 * ev.num_components)
@@ -131,7 +136,7 @@ def partial_costs(ev, placed_idx):
     return np.array([cm, off, on, wire])
 
 
-def construct_greedy(ev, rng, max_obj, m=4, tries=500, max_structures=20, structure=None):
+def construct_greedy(ev, rng, max_obj, m=4, tries=500, max_structures=20, structure=None, dim_max=2.0):
     """
     Like construct_feasible, but each component gets m clear candidate placements and keeps the one
     with the lowest weighted sum of partial_costs (random weights per design). The PCU goes first
@@ -140,8 +145,7 @@ def construct_greedy(ev, rng, max_obj, m=4, tries=500, max_structures=20, struct
     scale = np.asarray(max_obj[:4], dtype=float)
     for _ in range(max_structures):
         if structure is None:
-            s = [int(rng.integers(3)), rng.uniform(0.3, 2.0), rng.uniform(0.3, 2.0),
-                 rng.uniform(0.3, 2.0), int(rng.integers(ev.max_shelves + 1))]
+            s = random_structure(ev, rng, dim_max)
         else:
             s = list(structure)
         x = s + [0] * (5 * ev.num_components)

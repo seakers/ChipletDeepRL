@@ -1,0 +1,57 @@
+[
+ {
+  "name": "construct_only_dim1.2",
+  "method": "construct",
+  "set": {
+   "structure_dim_max": 1.2
+  }
+ },
+ {
+  "name": "struct_0.2_dim1.2",
+  "method": "ga",
+  "set": {
+   "ga_mutation": "component",
+   "ga_keep_elitism": 8,
+   "ga_init": "construct",
+   "ga_repair": true,
+   "ga_structure_mutation_rate": 0.2,
+   "structure_dim_max": 1.2
+  }
+ },
+ {
+  "name": "immig_0.2_dim1.2",
+  "method": "ga",
+  "set": {
+   "ga_mutation": "component",
+   "ga_keep_elitism": 8,
+   "ga_init": "construct",
+   "ga_repair": true,
+   "ga_immigrant_rate": 0.2,
+   "structure_dim_max": 1.2
+  }
+ },
+ {
+  "name": "struct_0.2_dim1.5",
+  "method": "ga",
+  "set": {
+   "ga_mutation": "component",
+   "ga_keep_elitism": 8,
+   "ga_init": "construct",
+   "ga_repair": true,
+   "ga_structure_mutation_rate": 0.2,
+   "structure_dim_max": 1.5
+  }
+ },
+ {
+  "name": "immig_0.2_dim1.5",
+  "method": "ga",
+  "set": {
+   "ga_mutation": "component",
+   "ga_keep_elitism": 8,
+   "ga_init": "construct",
+   "ga_repair": true,
+   "ga_immigrant_rate": 0.2,
+   "structure_dim_max": 1.5
+  }
+ }
+]

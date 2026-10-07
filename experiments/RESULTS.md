@@ -50,12 +50,12 @@ are in `data/`; arms in `arms/`.
 
 | Arm | HV at 64,000 | Minutes for 64,000 | Minutes for 16,000 |
 |---|---|---|---|
-| `struct_0.2` | 0.813 | 26-44 | about 14 |
+| `struct_0.2` | 0.813 | 26-44 | 7-12 |
 | `immig_0.2` | 0.810 | about 120 (loaded) | 19-21 |
 | `comp_construct_repair` | 0.796 | 16-32 | 4-8 |
 | `construct_only` | 0.783 | about 520 (loaded) | 82 |
 
-`oracle_free_mc` takes 50-88 minutes for 16,000, `greedy4` several hours. Counting time,
+`oracle_free_mc` takes 50-88 minutes for 16,000 and `greedy4` about 230 (0.791-0.795). Counting time,
 structure mutation is the best method, and the baseline GA run 4x longer matches immigrants.
 
 ## Structure transfer (`transfer`, `r7_transfer_ctrl`, `r9_volume`; 8,000 evaluations)
@@ -76,3 +76,16 @@ the 34 structures on the round 2 `immig_0.2` fronts.
 The gain comes from structure size and type, not the exact front structures: the matched pool
 ties or beats the front pool, and volume alone gets most of it. Front structures are about half
 the volume of uniformly sampled ones.
+
+## Capping structure size on the base manifest (`r11_dimmax`)
+
+Sampling shell sizes up to 1.2 or 1.5 m instead of 2 m (`structure_dim_max`), 4 seeds.
+
+| Arm | Uncapped | Cap 1.2 m | Cap 1.5 m |
+|---|---|---|---|
+| `struct_0.2` | 0.800 | 0.796 | 0.791 |
+| `immig_0.2` | 0.795 | 0.793 | 0.799 |
+| `construct_only` | 0.772 | 0.784 (4 of 4, p 0.054; 4.3x slower) | |
+
+The cap does not help the GAs; they already find good sizes. It helps constructed sampling,
+which never moves away from its sampled sizes, at a large cost in time.

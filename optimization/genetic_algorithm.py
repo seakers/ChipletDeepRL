@@ -58,13 +58,15 @@ def run_genetic_algorithm(max_obj, params, eval_function):
     oracle_info = []
     # params['structure_pool']: list of structures (genes 0-4) that constructed designs draw from
     pool = params.get('structure_pool')
+    # params['structure_dim_max']: upper bound (m) on sampled shell sizes, in construction and structure mutation
+    dim_max = params.get('structure_dim_max', 2.0)
 
     def construct():
         structure = pool[rng.integers(len(pool))] if pool else None
         if params.get('ga_greedy_m'):
             # objective-aware constructor for the initial population and immigrants
-            return construct_greedy(eval_function, rng, max_obj, m=params['ga_greedy_m'], structure=structure)
-        return construct_feasible(eval_function, rng, structure=structure)
+            return construct_greedy(eval_function, rng, max_obj, m=params['ga_greedy_m'], structure=structure, dim_max=dim_max)
+        return construct_feasible(eval_function, rng, structure=structure, dim_max=dim_max)
 
     def record(solution, objectives, constraints, constraint_vals):
         nonlocal NFE
@@ -150,7 +152,7 @@ def run_genetic_algorithm(max_obj, params, eval_function):
         g = rng.integers(5)
         var = des_space[g]
         if var['type'] == 'continuous':
-            child[g] = rng.uniform(*var['range'])
+            child[g] = rng.uniform(var['range'][0], min(var['range'][1], dim_max))
         else:
             child[g] = rng.choice(var['range'])
 

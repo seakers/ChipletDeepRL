@@ -20,9 +20,10 @@ def run_construct_search(max_obj, params, eval_function):
         structure = pool[rng.integers(len(pool))] if pool else None
         if params.get('construct_greedy_m'):
             # objective-aware placement; its partial cost checks are not counted as evaluations
-            x = construct_greedy(eval_function, rng, max_obj, m=params['construct_greedy_m'], structure=structure)
+            x = construct_greedy(eval_function, rng, max_obj, m=params['construct_greedy_m'], structure=structure,
+                                 dim_max=params.get('structure_dim_max', 2.0))
         else:
-            x = construct_feasible(eval_function, rng, structure=structure)
+            x = construct_feasible(eval_function, rng, structure=structure, dim_max=params.get('structure_dim_max', 2.0))
         if x is None:
             continue
         objectives, violated, _ = eval_function.evaluate(x)

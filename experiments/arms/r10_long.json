@@ -1,0 +1,23 @@
+[
+ {
+  "name": "struct_0.2",
+  "method": "ga",
+  "set": {
+   "ga_mutation": "component",
+   "ga_keep_elitism": 8,
+   "ga_init": "construct",
+   "ga_repair": true,
+   "ga_structure_mutation_rate": 0.2
+  }
+ },
+ {
+  "name": "comp_construct_repair",
+  "method": "ga",
+  "set": {
+   "ga_mutation": "component",
+   "ga_keep_elitism": 8,
+   "ga_init": "construct",
+   "ga_repair": true
+  }
+ }
+]
