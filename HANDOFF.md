@@ -139,7 +139,11 @@ to-do list; this file has the context, the rules, and the mistakes not to repeat
   because its update spilled out of GPU memory; chunking fixed it, same NFE).
 - Pick the budget and worker count so a round finishes; 3 workers for 36 jobs left `transfer`
   running 15 hours. Construction on compact (transferred) structures is 3-5x slower.
-- Check significance before claiming a win. At 4 seeds nothing was significant; 10 seeds settled it.
+- Say whether a difference is significant, and treat numbers from 2-4 seeds as provisional:
+  several shrank by about a third with more seeds. Use 4 seeds for screening. Add seeds only
+  for the few arms whose comparison matters, and only cheap arms (seeds 4-9 for four GA arms
+  took ~2.5 h on 7 workers). Do not run 10 seeds of everything or of slow arms (greedy,
+  construct-based, oracle) without asking Oliver.
 - Don't drop an idea on a flawed measure. The learned operator was dropped on the grid oracle,
   then reopened, then lowered again on the corrected one.
 - A warm start does not need a policy that produces feasible designs (IDETC Algorithm 1 just
