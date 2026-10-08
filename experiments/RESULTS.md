@@ -89,3 +89,21 @@ Sampling shell sizes up to 1.2 or 1.5 m instead of 2 m (`structure_dim_max`), 4 
 
 The cap does not help the GAs; they already find good sizes. It helps constructed sampling,
 which never moves away from its sampled sizes, at a large cost in time.
+
+## Constructive PPO (`r12_cppo`, `optimization/construct_ppo.py`)
+
+A policy picks the structure (of 8 random ones) and each placement (of 4 clear candidates),
+starting from greedy4's rule (`cppo_prior` 3) and learning a correction. Learning against the
+same setup with learning off, 4 seeds:
+
+| Evaluations | Learning off | lr 1e-3 | Difference | Wins | p |
+|---|---|---|---|---|---|
+| 2,000 | 0.784 | 0.789 | +0.005 | 3/4 | 0.31 |
+| 4,000 | 0.785 | 0.794 | +0.008 | 3/4 | 0.10 |
+| 8,000 | 0.787 | 0.798 | +0.011 | 4/4 | 0.05 |
+| 16,000 | 0.794 | 0.799 | +0.005 | 3/4 | 0.11 |
+
+The learned policy picks smaller structures (median front volume 0.47 against 0.59). lr 3e-3
+does worse (+0.002 at 16,000). Starting from random choices instead of greedy4's rule did not
+learn anything useful in 2,000 evaluations. A run takes about 7 hours (60-80% of builds hit a
+structure that cannot be filled), against about 14 minutes for `struct_0.2` at the same HV.
