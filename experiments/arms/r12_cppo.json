@@ -1,0 +1,5 @@
+[
+ {"name": "cppo_g_lr1e-3", "method": "cppo", "set": {"cppo_prior": 3.0, "cppo_lr": 0.001}},
+ {"name": "cppo_g_lr3e-3", "method": "cppo", "set": {"cppo_prior": 3.0, "cppo_lr": 0.003}},
+ {"name": "cppo_g_frozen", "method": "cppo", "set": {"cppo_prior": 3.0, "cppo_frozen": true}}
+]

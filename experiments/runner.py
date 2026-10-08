@@ -43,6 +43,7 @@ def _methods():
     from optimization.warm_start_intelligent_ga import run_warm_start_intelligent_ga
     from optimization.nsga3 import run_nsga3
     from optimization.construct_search import run_construct_search
+    from optimization.construct_ppo import run_construct_ppo
     # key: (function, needs max_values, name in main.py)
     return {
         'random': (run_random_search, False, 'Random Search'),
@@ -54,6 +55,7 @@ def _methods():
         'wsimga': (run_warm_start_intelligent_ga, True, 'Warm Start Intelligent Mutation GA'),
         'nsga3': (run_nsga3, True, 'NSGA-III (pymoo)'),
         'construct': (run_construct_search, True, 'Constructed random search'),
+        'cppo': (run_construct_ppo, True, 'Constructive PPO'),
     }
 
 

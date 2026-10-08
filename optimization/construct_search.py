@@ -31,6 +31,11 @@ def run_construct_search(max_obj, params, eval_function):
         all_obj.append(objectives)
         all_constraints.append(violated)
 
+    return grid_outputs(all_des, all_obj, all_constraints, max_obj, num_objectives)
+
+
+def grid_outputs(all_des, all_obj, all_constraints, max_obj, num_objectives):
+    # the outputs the runner expects, with the HV grid over the designs in evaluation order
     NFE = len(all_obj)
     all_obj = np.array(all_obj, dtype=float)
     all_constraints = np.array(all_constraints, dtype=bool)
