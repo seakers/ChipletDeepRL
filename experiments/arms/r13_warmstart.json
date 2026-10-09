@@ -1,0 +1,69 @@
+[
+ {
+  "name": "ws_cppo",
+  "method": "ga",
+  "set": {
+   "ga_mutation": "component",
+   "ga_keep_elitism": 8,
+   "ga_repair": true,
+   "ga_init": "file",
+   "ga_init_path": "experiments/reference/init/cppo_g_lr1e-3_s{seed}.npy"
+  }
+ },
+ {
+  "name": "ws_frozen",
+  "method": "ga",
+  "set": {
+   "ga_mutation": "component",
+   "ga_keep_elitism": 8,
+   "ga_repair": true,
+   "ga_init": "file",
+   "ga_init_path": "experiments/reference/init/cppo_g_frozen_s{seed}.npy"
+  }
+ },
+ {
+  "name": "comp_construct_repair",
+  "method": "ga",
+  "set": {
+   "ga_mutation": "component",
+   "ga_keep_elitism": 8,
+   "ga_repair": true,
+   "ga_init": "construct"
+  }
+ },
+ {
+  "name": "ws_cppo_struct_0.2",
+  "method": "ga",
+  "set": {
+   "ga_mutation": "component",
+   "ga_keep_elitism": 8,
+   "ga_repair": true,
+   "ga_structure_mutation_rate": 0.2,
+   "ga_init": "file",
+   "ga_init_path": "experiments/reference/init/cppo_g_lr1e-3_s{seed}.npy"
+  }
+ },
+ {
+  "name": "ws_frozen_struct_0.2",
+  "method": "ga",
+  "set": {
+   "ga_mutation": "component",
+   "ga_keep_elitism": 8,
+   "ga_repair": true,
+   "ga_structure_mutation_rate": 0.2,
+   "ga_init": "file",
+   "ga_init_path": "experiments/reference/init/cppo_g_frozen_s{seed}.npy"
+  }
+ },
+ {
+  "name": "struct_0.2",
+  "method": "ga",
+  "set": {
+   "ga_mutation": "component",
+   "ga_keep_elitism": 8,
+   "ga_repair": true,
+   "ga_structure_mutation_rate": 0.2,
+   "ga_init": "construct"
+  }
+ }
+]

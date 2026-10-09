@@ -107,3 +107,21 @@ The learned policy picks smaller structures (median front volume 0.47 against 0.
 does worse (+0.002 at 16,000). Starting from random choices instead of greedy4's rule did not
 learn anything useful in 2,000 evaluations. A run takes about 7 hours (60-80% of builds hit a
 structure that cannot be filled), against about 14 minutes for `struct_0.2` at the same HV.
+
+## Warm start from the constructive PPO policy (`r13_warmstart`)
+
+The IDETC paper's best method: the GA's initial 64 designs sampled from a trained policy
+(`sample_policy_init.py`, the `r12_cppo` lr 1e-3 policy of the same seed), against the same
+policy with learning off (greedy4's rule) and against constructed starts. 4 seeds.
+
+| GA | Evaluations | Constructed start | Learned-policy start | Learning-off start |
+|---|---|---|---|---|
+| plain | 500 | 0.730 | 0.762 | 0.757 |
+| plain | 16,000 | 0.784 | 0.785 | 0.786 |
+| structure mutation | 500 | 0.726 | 0.762 | 0.754 |
+| structure mutation | 16,000 | 0.800 | 0.795 | 0.788 |
+
+Policy starts help early (about +0.03 at 500 evaluations) and nothing by 16,000; with structure
+mutation they end slightly lower (not significant). Learned and learning-off starts do not
+differ. The paper's GA started from random, mostly infeasible designs, so any decent start
+helped it; ours already starts from feasible constructed designs.

@@ -34,6 +34,69 @@ def placement_features(ev, x, i, cost, before, scale, step, w):
                            comp_feat, [step], w])
 
 
+def logits_of(net, feats, prior):
+    return net(torch.as_tensor(np.array(feats), dtype=torch.float32)).squeeze(-1) + torch.as_tensor(prior)
+
+
+def choose(rng, net, feats, prior):
+    with torch.no_grad():
+        probs = torch.softmax(logits_of(net, feats, prior), 0).numpy().astype(float)
+    k = int(rng.choice(len(probs), p=probs / probs.sum()))
+    return k, float(np.log(probs[k] + 1e-12))
+
+
+def build_design(ev, rng, struct_net, place_net, w, scale, m=4, S=8, prior_b=0.0):
+    """One build. Returns (design or None, decisions); decisions are (net, feats, prior, choice, logp)."""
+    cands = [random_structure(ev, rng) for _ in range(S)]
+    feats = [structure_features(s, w) for s in cands]
+    no_prior = np.zeros(S, dtype=np.float32)
+    k, lp = choose(rng, struct_net, feats, no_prior)
+    steps = [(0, feats, no_prior, k, lp)]
+    w4 = w[:4] / w[:4].sum()
+    x = list(cands[k]) + [0] * (5 * ev.num_components)
+    ev.get_structural_panels(x)
+    pcu = [j for j, c in enumerate(ev.component_list) if c.type == 'PCU']
+    order = pcu + [int(j) for j in rng.permutation(ev.num_components) if j not in pcu]
+    placed, done = EMPTY, []
+    before = np.zeros(4)
+    for n, i in enumerate(order):
+        options = []
+        for _ in range(m):
+            new = place_clear(ev, x, i, placed, rng, 500)
+            if new is None:
+                break
+            cost = partial_costs(ev, done + [i])
+            f = placement_features(ev, x, i, cost, before, scale, n / len(order), w)
+            options.append((f, list(x[5 + 5 * i:10 + 5 * i]), new, cost))
+        if not options:
+            return None, steps
+        score = np.array([w4 @ (o[3] / scale) for o in options])
+        prior = (-prior_b * (score - score.mean()) / (score.std() + 1e-12)).astype(np.float32)
+        k, lp = choose(rng, place_net, [o[0] for o in options], prior)
+        steps.append((1, [o[0] for o in options], prior, k, lp))
+        x[5 + 5 * i:10 + 5 * i] = options[k][1]
+        ev.place_component(i, x)
+        placed = stack(placed, options[k][2])
+        done.append(i)
+        before = options[k][3]
+    return x, steps
+
+
+def sample_designs(ev, rng, path, n, max_obj, prior_b=3.0, m=4, S=8):
+    """n designs from a saved policy (construct_ppo.pth), each with random objective weights."""
+    struct_net, place_net = mlp(N_STRUCT_FEAT), mlp(N_PLACE_FEAT)
+    state = torch.load(path)
+    struct_net.load_state_dict(state['struct'])
+    place_net.load_state_dict(state['place'])
+    scale = np.asarray(max_obj, dtype=float)[:4]
+    out = []
+    while len(out) < n:
+        x, _ = build_design(ev, rng, struct_net, place_net, rng.dirichlet(np.ones(5)), scale, m, S, prior_b)
+        if x is not None:
+            out.append(x)
+    return out
+
+
 def run_construct_ppo(max_obj, params, eval_function):
     """
     Constructive PPO: builds each design like construct_greedy, but a policy picks the structure
@@ -65,51 +128,6 @@ def run_construct_ppo(max_obj, params, eval_function):
     struct_net, place_net = mlp(N_STRUCT_FEAT), mlp(N_PLACE_FEAT)
     opt = torch.optim.Adam(list(struct_net.parameters()) + list(place_net.parameters()), lr=lr)
 
-    def logits_of(net, feats, prior):
-        return net(torch.as_tensor(np.array(feats), dtype=torch.float32)).squeeze(-1) + torch.as_tensor(prior)
-
-    def choose(net, feats, prior):
-        with torch.no_grad():
-            probs = torch.softmax(logits_of(net, feats, prior), 0).numpy().astype(float)
-        k = int(rng.choice(len(probs), p=probs / probs.sum()))
-        return k, float(np.log(probs[k] + 1e-12))
-
-    def build(w):
-        """One attempt. Returns (design or None, decisions); decisions are (net, feats, choice, logp)."""
-        cands = [random_structure(ev, rng) for _ in range(S)]
-        feats = [structure_features(s, w) for s in cands]
-        no_prior = np.zeros(S, dtype=np.float32)
-        k, lp = choose(struct_net, feats, no_prior)
-        steps = [(0, feats, no_prior, k, lp)]
-        w4 = w[:4] / w[:4].sum()
-        x = list(cands[k]) + [0] * (5 * ev.num_components)
-        ev.get_structural_panels(x)
-        pcu = [j for j, c in enumerate(ev.component_list) if c.type == 'PCU']
-        order = pcu + [int(j) for j in rng.permutation(ev.num_components) if j not in pcu]
-        placed, done = EMPTY, []
-        before = np.zeros(4)
-        for n, i in enumerate(order):
-            options = []
-            for _ in range(m):
-                new = place_clear(ev, x, i, placed, rng, 500)
-                if new is None:
-                    break
-                cost = partial_costs(ev, done + [i])
-                f = placement_features(ev, x, i, cost, before, scale, n / len(order), w)
-                options.append((f, list(x[5 + 5 * i:10 + 5 * i]), new, cost))
-            if not options:
-                return None, steps
-            score = np.array([w4 @ (o[3] / scale) for o in options])
-            prior = (-prior_b * (score - score.mean()) / (score.std() + 1e-12)).astype(np.float32)
-            k, lp = choose(place_net, [o[0] for o in options], prior)
-            steps.append((1, [o[0] for o in options], prior, k, lp))
-            x[5 + 5 * i:10 + 5 * i] = options[k][1]
-            ev.place_component(i, x)
-            placed = stack(placed, options[k][2])
-            done.append(i)
-            before = options[k][3]
-        return x, steps
-
     def update(episodes):
         # finished designs are ranked against each other; failed builds get a fixed penalty
         r = np.array([e[1] for e in episodes if e[1] is not None])
@@ -135,7 +153,7 @@ def run_construct_ppo(max_obj, params, eval_function):
         w = rng.dirichlet(np.ones(5))
         episodes = []
         while len(episodes) < batch and len(all_obj) < budget:
-            x, steps = build(w)
+            x, steps = build_design(ev, rng, struct_net, place_net, w, scale, m, S, prior_b)
             if x is None:
                 # unfillable structure: penalize the choices that led here, no evaluation
                 episodes.append((steps, None))
