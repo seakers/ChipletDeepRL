@@ -1,191 +1,156 @@
-# Handoff (2026-10-06, 20:00)
+# Handoff (2026-10-11, Sunday afternoon)
 
-Read this whole file before doing anything. The plan doc (below) has the latest results and
-to-do list; this file has the context, the rules, and the mistakes not to repeat.
+Read this whole file before doing anything. Results are in `experiments/RESULTS.md`; the plan doc
+has the meeting notes and change log; this file has the context, rules and mistakes not to repeat.
 
 ## Context
 
 - Oliver is a high schooler working with Dr. Daniel Selva (Texas A&M) and his PhD student Alex
-  Demagall. Use they/them for anyone whose pronouns are not stated.
+  Demagall. Use they/them for anyone whose pronouns are not stated. His math background: AP Calc
+  BC and AP Stats; no linear algebra, RL theory or transformer internals assumed (see memory).
 - This repo is the spacecraft configuration problem: 41 components, 210 variables (5 structure
   genes + 5 per component), 5 minimization objectives, no-overlap constraint. `../truss_deep_rl`
-  is the same family of methods on a truss (report: https://claude.ai/artifact/W1TwphpTjB6NzkJxFisfzd).
-- Alex's papers are in the repo root: `IDETC_Paper_2026-2.pdf` (RL policies as GA warm start and
-  mutation) and `SciTech_Paper_2026 (1).pdf`. Read them with pypdf (installed in `.venv`); the
-  Read tool cannot render PDFs here.
-- Plan doc (Claude Doc, Oliver reads it on his phone):
-  https://claude.ai/code/artifact/8a9fb288-e4dc-4211-abbe-f77b65f262ad. Project id
-  `8a9fb288-e4dc-4211-abbe-f77b65f262ad`, tab file `9e8da4a0-b25a`, body node `ef992469-1fa3`.
-  Sections: Where things stand (summary + standings chart, widget `f244e82f-7fea`), round 1
-  findings (widget `eba8ceaf-5720`), round 2 (pool chart `7b54d121-1fa9`), Running now, To do,
-  Dropped, Questions and reminders (all 14 questions for Alex), Change log (newest first).
-  Read with `sinceRev` before editing; Oliver may edit it.
-- Oliver is emailing Alex the top 5 questions and asking to meet Fri-Tue (fall break). Do not
-  send anything to Alex yourself.
+  is the same family of methods on a truss.
+- Alex's papers: `IDETC_Paper_2026-2.pdf`, `SciTech_Paper_2026 (1).pdf` (read with pypdf).
+- **Meeting with Alex: Monday Oct 12** (Oliver set the time). Oliver emails Alex himself; never
+  contact Alex, and don't put the doc link in emails.
+
+### Alex's answers (email, Oct 9)
+
+- IDETC results came from `110a859` ("small adjustments for hprc", Mar 17, `rl_moo`). SciTech
+  came from an older separate repo (SpaDes_Con, private); Oliver said to leave it out.
+- PPO settings: where the paper and the code disagree, use the code. At 110a859: lr 1e-4, clip
+  0.2, lambda 0.95, mini-batch 64, 5 update iterations, target KL 0.003, 500 epochs (32,000
+  evaluations), GA population 64, 21-cell HV grid, reference 2.0x the random-search max.
+- Thermal: he likes neither model; wants something cheap and physically meaningful; the new
+  one (shell area only) is probably better. Don't change it without Oliver.
+- Reference point: includes infeasible designs; any upper bound is fine.
+
+### Where things are written
+
+- Plan doc (Claude Doc): https://claude.ai/code/artifact/8a9fb288-e4dc-4211-abbe-f77b65f262ad.
+  Project `8a9fb288-e4dc-4211-abbe-f77b65f262ad`. Main tab file `9e8da4a0-b25a`, body node
+  `ef992469-1fa3`: Meeting with Alex section at the top (his answers, what 110a859 has, the
+  IDETC rerun table, 10 questions, results to have ready), What we changed and why (short,
+  links to the explainer), older round sections, Running now, To do, Change log (newest first).
+  Second tab "Technical explainer": file `a28bb075-6f66`, body node `9367a2a5-905a`. Edits need
+  full ids (`m990xsc15ss.N`); read with `sinceRev` first (last rev seen: main 64, tab 9).
+- Technical Notes page (HTML artifact, private, Oliver shares it):
+  https://claude.ai/artifact/WUkcZpL3eq1uHTmeuNy8Wg. Parts 1-7 explain the problem, the overlap
+  bug, each fix and each method from the basics up with MathJax and interactive figures; part 8
+  has the result figures. Source: `experiments/technical_notes/index.html`; its images are
+  published as `figs/<name>.png` from `experiments/figures/`. To update from a new session, read
+  the artifact first (`action: read`), then publish with `url`.
+- `experiments/RESULTS.md`: all results, including the IDETC re-check (last section).
 
 ## Oliver's rules
 
-- Never push. Work on the local branch `experiments`; commit locally with the attribution line.
-- No "AI slop" in code or docs: short plain comments, no essay docstrings, plain wording.
-- Fix real logic errors instead of keeping them for comparability; Alex's commits may be work
-  in progress.
-- Do not add the papers' thermal model (variance of heat transfer). Oliver said keep the current
-  single-temperature model and the current run settings, but use the IDETC reference point.
-- Remind Oliver about option 2 when relevant (see Reminders); it is his to try.
-- Don't use `C:\dev\envs\ml`; use the repo `.venv` (uv, Python 3.12, torch cu128, pygad 3.5.0,
-  pymoo 0.6.1.5).
+- Never push. Work on the local branch `experiments`; commit locally in batches, with the
+  attribution line.
+- No "AI slop" in code or docs: short plain comments, plain wording.
+- Fix real logic errors instead of keeping them for comparability.
+- Keep the current thermal model and run settings; IDETC reference point
+  (`experiments/reference/random_1.5.npy`).
+- Explanations (chat and docs) must not assume he knows the codebase; build up from the idea to
+  the math to the technical version. He likes LaTeX and visualizations for hard parts.
+- Use the repo `.venv` (uv, Python 3.12, torch cu128), not `C:\dev\envs\ml`.
+- Ask before restarting anything killed for low memory, and before running 10 seeds of
+  anything or seeds of slow arms.
 
-## Machine and load (these went wrong before; follow them)
+## Machine and load
 
-- RTX 5070 12 GB, 32 GB RAM, Ryzen 7 8700F (8 cores, 16 threads), Windows.
-- GPU: one job at a time, throttled: `--set gpu_duty=0.5 --set update_chunk=512
-  --gpu-memory-fraction 0.4`. Check with nvidia-smi. Two unthrottled jobs once pinned it at 99%
-  and froze Oliver's video call.
-- CPU: no cap; Oliver removed it. Runners at BelowNormal priority (`experiments/launch.sh` sets
-  it). Idle priority alone did not stop lag, which is why it was capped for a while.
-- Memory: keep at least ~8 GB free. On Oct 6 at 05:41, ~20 runner processes (~14 GB) plus Chrome
-  (8+ GB) left 2.8 GB free and Claude Code killed every background shell. Runner processes
-  survived, but all watchers and launchers died, so nothing new started for ~10 hours. Keep
-  workers to about 14 or fewer and check free RAM (PowerShell `Win32_OperatingSystem`) before
-  adding more.
-- Keep the machine busy when work is queued. Oliver noticed idle hours twice. When a round
-  finishes, start the next one; use a cheap background `until` loop as a wake-up.
-- TaskStop on a background `sh` launcher can leave its loop alive (it launched a duplicate set
-  of runs once). After stopping one, list runner processes by command line and kill strays.
-  Do not kill bash processes by a loose command-line match: that once killed the shell hosting
-  live runners.
-- Each runner is two processes (venv launcher + child), so process counts are 2x workers.
+- RTX 5070 12 GB, 32 GB RAM, Ryzen 7 8700F (16 threads), Windows.
+- GPU: use it, but never at 100%. runner.py jobs: one at a time with `--set gpu_duty=0.5 --set
+  update_chunk=512 --gpu-memory-fraction 0.4`. Code without a throttle (e.g. old commits) would
+  run flat out; say so and choose.
+- CPU: runners at BelowNormal, no cap. Keep ~8 GB RAM free (Oliver often has many Chrome tabs).
+  The old commit's PPO uses ~7 GB per process on the CPU; two of them plus Chrome left 3.6 GB,
+  one died silently (Oct 10 18:06) and Claude Code reaped a background watcher.
+- The PC sleeps (Modern Standby) when the screen turns off. `experiments/launch.sh` starts
+  `experiments/keepawake.ps1` automatically; for other scripts run
+  `keepawake.ps1 -Pattern '*script.py*'`. A process check whose own command line contains the
+  pattern matches itself; exclude `$PID`.
+- Runs started with `nohup ... &` survive memory reaping but send no notification. Pair them
+  with a Claude background task (`run_in_background`) that waits on them, and check status
+  before telling Oliver something is running or done.
+- Each python run is two processes (venv launcher + child).
 
-## Code state (see `git log`, latest commits fbec059 and "Seeds 4-9 ...")
+## Code state (latest commit 1f421d2)
 
-- Evaluator fixes (98087c3): pointing rod / port offset, inertia rotation, panel mass, polygon
-  top/bottom/shelf panels with an on-panel rule, thermal area without shelves, shelf frame.
-  Verified against LP overlap checks and Monte Carlo inertia.
-- PPO fixes behind `params['legacy_ppo']` (README lists them).
-- `utils/fast_evaluation.py` (numpy overlaps, identical results), `utils/geometry.py`.
-- `utils/construct.py`: `construct_feasible` (place one component at a time with rejection),
-  `repair_overlaps`, `construct_greedy` (m clear candidates per component, keep the best by a
-  random weighted sum of partial costs; PCU first), `partial_costs`.
-- `utils/hypervolume_utils.py`: `MonteCarloArchive` (MC HV contribution, exact `improves()`).
-- `optimization/genetic_algorithm.py` params: `ga_init` construct/file, `ga_repair`,
-  `ga_mutation` component/actor, `ga_move` local (`ga_local_step`), `ga_keep_elitism`,
-  `ga_oracle` free/charged with `ga_oracle_metric: mc` (use mc; the grid default is wrong on the
-  IDETC reference), `ga_immigrant_rate`, `ga_structure_mutation_rate`, `structure_pool`,
-  `ga_greedy_m` (greedy init and immigrants), `ga_restarts`, `nfe_budget`.
-- `optimization/construct_search.py`: `construct_num_structures` (pool size),
-  `structure_pool`, `construct_greedy_m`.
-- `optimization/ppo_optimization_informed_state.py`: `ppo_repair` (repair each sample before
-  evaluation).
-- `experiments/runner.py`: arms JSON, `--seeds`, `--budget`, `--ref`, `--set`, `--shard/--nshards`,
-  `--shard-label` (extra workers write their own file). Skips jobs finished in any shard file of
-  the tag, but not jobs another worker is running, so overlapping workers can duplicate a job
-  (load() dedupes by job_id). Records keep `front_raw` (raw nondominated objectives of all
-  feasible designs), `front_raw_struct`, `front_raw_curve` (raw fronts after 500...32000
-  evaluations), `started`/`finished` (before Oct 6 16:30, `finished` was the start time).
-- `experiments/launch.sh TAG ARMS BUDGET NSHARDS [SEEDS]`: starts workers on the IDETC reference
-  at BelowNormal and waits. Run it with run_in_background so its exit notifies you.
-- `experiments/summarize_raw.py TAGS --base ARM [--at N]`: exact HV (Monte Carlo, fixed sample)
-  from `front_raw` on `experiments/reference/random_1.5.npy`. Use this, not `summarize.py`.
-- References: `random_1.5.npy` (IDETC rule, 1.5x max over 16,000 random designs, feasible or
-  not) is current. `feasible.npy` (1.1x constructed max) was round 1 only.
-- Uncommitted: `experiments/arms/_t_*.json` (one-arm files for extra transfer workers),
-  `experiments/logs/_rest.sh`. Fine to delete.
+- Evaluator fixes (98087c3), PPO fixes behind `legacy_ppo` (README), fast overlaps,
+  `utils/construct.py` (constructor, greedy4, repair, `random_structure`, `dim_max`).
+- `optimization/construct_ppo.py`: constructive PPO (method `cppo`), greedy prior `cppo_prior`.
+- `experiments/runner.py`, `launch.sh`, `summarize_raw.py` (exact HV; use this),
+  `make_figures.py` (writes `experiments/figures/*.png`, HV cache in `figures/hv_cache.json`;
+  delete the cache after adding runs), `sample_policy_init.py`, `build_matched_pool.py`.
+- `experiments/probes/`: per-commit feasibility probes and the old overlap test.
+  `experiments/probes/idetc/`: `run_idetc.py` (runs 110a859's own methods, keeps the designs
+  its test accepts; cwd = a worktree of 110a859), `recheck_idetc.py` (correct test, overlap
+  counts and depths), `render_overlaps.py` (3D pictures).
+- Not committed: `experiments/data/idetc_designs/*.npz` (11 MB, the designs 110a859 accepted,
+  per method and seed), `experiments/technical_notes/index.html`, scratch arms files
+  `experiments/arms/_*.json`, modified `experiments/data/cpu_shard_*.jsonl` (round 1 shards
+  touched by a later run; leave as is unless Oliver asks).
+- Scratchpad worktrees (`wt_*`, including `wt_110a859`) live in the old session's scratchpad;
+  `git worktree list` shows them. They can be pruned (`git worktree prune` after deleting).
 
-## Data (experiments/data, tags)
+## Data tags (experiments/data)
 
-- `cpu`: round 1, 18 arms x 8 seeds, old reference, fronts cut at the old reference (rescoring
-  on the new one is a lower bound).
-- `gpu`: synthesis PPO seed 0 (0 feasible) and `ppo_repair` seeds 0-2.
-- `r2`, `r2_greedy`, `r2_long` (64,000 NFE), `r3`, `r4_oracle`, `r6_seeds` (seeds 4-9 of the top 4
-  arms), `transfer` (8,000 NFE, manifests 1 and 2, pool of 34 structures from r2 `immig_0.2`
-  fronts). All on the IDETC reference with raw fronts. Nothing is running.
-- Saved actors: `results/runs/gpu/ppo_s0/actor_model.pth`, `results/runs/gpu/ppo_repair_s{0,1,2}/`.
+r2, r2_greedy, r2_long, r3, r4_oracle, r5, r6_seeds (seeds 4-9), r7_transfer_ctrl, r8_time
+(curve_time), r9_volume, r10_long (64k), r11_dimmax, r12_cppo, r13_warmstart, transfer,
+gpu_idetc (PPO with IDETC settings). `S.load` keys by [arm][seed], so load tags one at a time
+when the same arm name appears in several tags. `cpu` is round 1 on the old reference.
 
-## Findings (exact HV, IDETC reference, 16,000 NFE unless noted)
+## Findings (exact HV, IDETC reference, 16,000 evaluations unless noted)
 
-- Random designs are never feasible (0/5000). Constructed starts and overlap repair are what
-  make any method work; GAs without them score far lower.
-- Baseline GA with constructed starts and repair (`comp_construct_repair`): 0.778 (10 seeds).
-  Adding structure diversity helps: 20% immigrants 0.794, structure mutation 0.793 (10 seeds,
-  8-9/10 wins, paired p 0.003-0.013). Free oracle with MC HV (best of 8 component moves, lookahead
-  not charged) 0.792, same as those (p > 0.7). So a learned mutation operator has a low ceiling.
-- Immigrant rate: best near 0.2. Immigrants + structure mutation together do not add up. 32
-  elites instead of 8 and local position moves do not help.
-- Fewer structures, less HV: pools of 1, 4, 16, 64 structures give 0.57, 0.70, 0.75, 0.75;
-  unlimited constructed sampling 0.772.
-- Greedy constructor beats plain constructed sampling (+0.020, 4/4, p 0.004), ties the best GAs,
-  but takes ~6 h per run against 10-40 min.
-- At 64,000 NFE: GA + immigrants 0.810, constructed sampling 0.783.
-- Structure transfer: reusing the 34 front structures on two varied manifests gives +0.017 for
-  constructed sampling and +0.017 to +0.021 for GA + immigrants, 16/16 paired wins.
-- RL: synthesis PPO found 0 feasible designs; `ppo_repair` found 2-75 feasible in 16,000, all
-  early, HV 0.56-0.64 (lower bound) against ~0.78. Likely reasons, unconfirmed: the problem got
-  harder after the papers (Alex's c22d2a6 changed overlap, thermal and components; IDETC random
-  search found feasible designs, ours never does), and our settings give 6x fewer policy updates
-  than IDETC (mini-batch 64 x 250 epochs vs 16 x 1500; lr 1e-3 vs 3e-4; clip 0.2 vs 0.05).
-- `thermal_cost` (current code) depends only on shell area, so layout cannot affect it. Under
-  the round 1 reference this made structure diversity dominate; the IDETC reference counts
-  thermal much less, which is why plain constructed sampling dropped below the repaired GAs.
+- **The overlap test before ab59dbe (Aug 6) counted any two boxes with parallel edges as clear**
+  (a subtracted tolerance cancelled the padding for zero-length cross axes). Every component
+  has an axis along its panel normal, so most pairs were never really tested.
+- **IDETC rerun (Oct 10-11):** 110a859's own methods, 2 seeds. Of the designs its test called
+  feasible (random search 61, GA ~7,900, warm-start GA ~8,000, design repair 230,
+  intelligent-mutation GA 10,285, PPO 3,447, warm-start intelligent-mutation GA ~37,600), none
+  pass a correct test. GA designs: median 2-4 overlapping component pairs, deepest 7-10 cm.
+  PPO-based designs pile components together: ~200 (PPO) and ~400 (warm-start IM GA) of 820
+  pairs overlap. A random 2,000 were checked where there were more. Figures `figures/idetc_*.png`.
+- On the corrected code no random design is feasible; constructed starts and repair make every
+  method work. GA with constructed start + repair 0.778 (10 seeds); immigrants 0.794, structure
+  mutation 0.793, free oracle 0.792 (tied). greedy4 0.793. Constructed sampling 0.772.
+- Synthesis PPO: 0 feasible with our and IDETC settings; PPO + repair ~0.60.
+- Constructive PPO (lr 1e-3, greedy prior b=3): +0.011 over learning off at 8k (4/4, p 0.05),
+  +0.005 at 16k (0.799); ~7 h per run vs ~14 min for structure mutation at the same HV.
+- Warm start from the policy: +0.03 at 500 evaluations, nothing by 16k.
+- Structure transfer: +0.02 on new component lists, but matched random structures of the same
+  type and volume do as well.
+- Time: evaluation 4 ms, construction 0.4 s, greedy 1.4 s; per minute structure mutation wins.
+  64k evaluations: structure mutation 0.813, best single run 0.821; all 208 runs pooled 0.832,
+  so little headroom remains on this problem as defined.
+- thermal depends only on shell area, so structure dominates; RL looks worthwhile only with an
+  expensive evaluator or many component lists (untested: constructive PPO trained across many
+  manifests, scored on unseen ones).
 
 ## Mistakes not to repeat
 
-- Do not build conclusions on a known-wrong evaluator. Round 1 originally ran with the
-  rod-offset bug "for comparability"; Oliver rejected that and everything was rerun.
-- Do not trust the 21-cell HV grid on the IDETC reference: it saturates (greedy4 sat at 0.67 from
-  2,500 NFE while exact HV kept rising). The oracle arms that used it reported 0-1% improving
-  steps; with exact checks it is 19-24%. Use exact/MC HV for results and for any in-run scoring.
-- Equal NFE is not equal cost. Construction ~0.4 s, greedy ~1.4 s, an evaluation ~4 ms. Say so
-  when comparing, and do not call a method "too slow" without measuring why (PPO once looked slow
-  because its update spilled out of GPU memory; chunking fixed it, same NFE).
-- Pick the budget and worker count so a round finishes; 3 workers for 36 jobs left `transfer`
-  running 15 hours. Construction on compact (transferred) structures is 3-5x slower.
-- Say whether a difference is significant, and treat numbers from 2-4 seeds as provisional:
-  several shrank by about a third with more seeds. Use 4 seeds for screening. Add seeds only
-  for the few arms whose comparison matters, and only cheap arms (seeds 4-9 for four GA arms
-  took ~2.5 h on 7 workers). Do not run 10 seeds of everything or of slow arms (greedy,
-  construct-based, oracle) without asking Oliver.
-- Don't drop an idea on a flawed measure. The learned operator was dropped on the grid oracle,
-  then reopened, then lowered again on the corrected one.
-- A warm start does not need a policy that produces feasible designs (IDETC Algorithm 1 just
-  samples the policy; the GA's repair fixes them). I said otherwise once and had to correct it.
-- Changing the reference point changes rankings. Report which reference a number is on.
-- Ask before restarting anything Claude Code killed for low memory. Oliver did not approve
-  restarting r5 yet.
+- Read the code before estimating a budget or confessing a mistake. I told Oliver design repair
+  ran at a tenth of its budget because I misread its stopping rule; it stops by evaluation
+  count and does one pass either way. The correction cost a rerun and a retraction.
+- Don't say something is running, done, or will notify you without checking. Detached runs
+  don't notify.
+- Check free RAM before starting memory-heavy runs in parallel (see Machine).
+- Python heredocs that write `'\n'` into source files turn it into a real newline and break the
+  string; use the Edit tool for any replacement containing escapes.
+- MathJax SVG output is `svg` inside `mjx-container`; a page rule like `.fig svg {width:100%}`
+  blows the math up. Scope figure rules to direct children.
+- Plots: start bar axes near the data, not at 0, when differences are small; label seeds and
+  which seeds are compared; don't splice runs with different seeds onto one curve.
+- Earlier mistakes (see git history of this file): building on a known-wrong evaluator, trusting
+  the 21-cell HV grid, equal NFE treated as equal cost, too few workers for a round, unchecked
+  significance, dropping ideas on flawed measures, killing shells by loose command-line match.
 
-## Next (also in the doc's To do)
+## Next
 
-1. Ask Oliver first, then: restart round 5 (`experiments/arms/r5.json`: `restart4`,
-   `greedy_init`, `greedy_immig_0.2`; ~4 h) and the transfer controls (a pool of 34 random
-   compact structures; transfer with `struct_0.2`; needs a new arms file, ~3 h). ~10 workers.
-2. Once Alex says which commit each paper used: run random search on that commit in a separate
-   worktree (does it find feasible designs?), then synthesis PPO with IDETC settings on the GPU.
-3. Optional, not now: GA warm-started from the saved PPO actors (Oliver said not now).
-4. HV against wall-clock time on an unloaded machine.
-5. Learned mutation operator: low priority (ceiling equals free structure mutation).
-6. Rewrite `experiments/RESULTS.md` and the README "Open questions" from these results
-   (the geometry item is fixed; keep `model_folder`, the two HV implementations, random search
-   normalization, unused transformer variants).
-
-## Reminders for Oliver
-
-- Option 2: synthesis PPO that places components one at a time, rejecting positions that overlap
-  components already placed, so every design is feasible and PPO only learns objectives.
-  `greedy4` is the non-learned version and the bar to beat.
-- The full list of 14 questions for Alex is in the doc; the email has the top 5.
-
-## Oct 7 update
-
-- Results are in `experiments/RESULTS.md` and the doc. Main ones: the overlap test before ab59dbe
-  missed overlaps between boxes with parallel edges (`experiments/probes/`), which explains the
-  papers' feasible random designs and RL results; PPO with the IDETC settings does no better
-  (`gpu_idetc`); structure transfer works through size and type (`r7_transfer_ctrl`,
-  `r9_volume`); per minute, structure mutation is the best method (`r8_time`, `r10_long`);
-  a size cap (`structure_dim_max`, `r11_dimmax`) does not help the GAs.
-- The PC enters Modern Standby when the screen turns off and suspends every runner. Before
-  leaving runs unattended, start a keep-awake loop (PowerShell `SetThreadExecutionState`
-  0x80000003 while any `runner.py` process exists). Check progress by process CPU time.
-- Construction on small shells is several times slower: `construct_only_dim1.2` took ~6 h per
-  run. Estimate construct-based arms from similar compact runs, not from `construct_only`.
-- Records now keep `curve_time` (seconds at each raw-curve checkpoint).
-- Nothing is running. No experiments are queued; the GPU ideas left are option 2 (Oliver's)
-  and the warm start (Oliver said not now).
+1. The meeting (Monday). Bring the Technical Notes page (share it first) and the doc's question
+   list. Questions 1 (overlap test and IDETC rerun) and 5 (project goal) matter most.
+2. After the meeting, depending on Alex: the multi-manifest constructive PPO test; a new thermal
+   model if he picks one; sharing code (Oliver decides how; never push yourself).
+3. Housekeeping when convenient: prune scratchpad worktrees; decide whether to commit
+   `experiments/data/idetc_designs` and `experiments/technical_notes`.
