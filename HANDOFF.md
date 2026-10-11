@@ -54,7 +54,8 @@ has the meeting notes and change log; this file has the context, rules and mista
 - Explanations (chat and docs) must not assume he knows the codebase; build up from the idea to
   the math to the technical version. He likes LaTeX and visualizations for hard parts.
 - Use the repo `.venv` (uv, Python 3.12, torch cu128), not `C:\dev\envs\ml`.
-- Ask before restarting anything killed for low memory, and before running 10 seeds of
+- A run that died (low memory or otherwise) can be restarted without asking, once free RAM
+  allows; tell Oliver what died and when it restarted. Still ask before running 10 seeds of
   anything or seeds of slow arms.
 
 ## Machine and load
