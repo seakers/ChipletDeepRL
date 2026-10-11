@@ -125,3 +125,24 @@ Policy starts help early (about +0.03 at 500 evaluations) and nothing by 16,000;
 mutation they end slightly lower (not significant). Learned and learning-off starts do not
 differ. The paper's GA started from random, mostly infeasible designs, so any decent start
 helped it; ours already starts from feasible constructed designs.
+
+## The IDETC setup, re-checked (`probes/idetc/`, `data/idetc_recheck.json`)
+
+110a859 (the commit the IDETC results came from) run with its own methods and settings, 2 seeds,
+32,000 evaluations; PPO in fp32 on the CPU (that commit's fp16 cannot sample on the CPU). Every
+design its overlap test called feasible was re-checked with the ab59dbe test, all other geometry
+unchanged (a random 2,000 where there were more).
+
+| Method | Feasible by its test (seed 0 / 1) | Pass a correct test | Overlapping component pairs (median) |
+|---|---|---|---|
+| Random search | 29 / 32 | 0 | 3 |
+| GA | 3,733 / 4,138 | 0 | 3 |
+| Warm-start GA | 4,159 / 3,822 | 0 | 2-3 |
+| Design repair | 116 / 114 | 0 | 3 |
+| Intelligent-mutation GA | 0 / 10,285 | 0 | 4 |
+| Synthesis PPO (informed state) | 3,306 / 141 | 0 | 167-230 |
+| Warm-start intelligent-mutation GA | 21,528 / 16,117 | 0 | 381-402 |
+
+The deepest component overlap is typically 7-10 cm for the GAs and 18-26 cm for the PPO-based
+methods, which pile components together. Figures: `figures/idetc_*.png`, from
+`make_figures.py` and `probes/idetc/render_overlaps.py`.

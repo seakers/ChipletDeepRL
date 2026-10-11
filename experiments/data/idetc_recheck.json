@@ -1,0 +1,156 @@
+{
+ "design_repair_s0": {
+  "evals": 57236,
+  "old_feasible": 116,
+  "checked": 116,
+  "pass_correct": 0,
+  "median_comp_pairs": 3.0,
+  "share_with_comp_overlap": 0.9568965517241379,
+  "median_rod_hits": 4.0,
+  "median_panel_hits": 17.0,
+  "median_deepest_comp_overlap_m": 0.08658464520864774
+ },
+ "design_repair_s1": {
+  "evals": 66951,
+  "old_feasible": 114,
+  "checked": 114,
+  "pass_correct": 0,
+  "median_comp_pairs": 3.0,
+  "share_with_comp_overlap": 0.9736842105263158,
+  "median_rod_hits": 4.0,
+  "median_panel_hits": 18.0,
+  "median_deepest_comp_overlap_m": 0.09289308995204901
+ },
+ "genetic_algorithm_s0": {
+  "evals": 31564,
+  "old_feasible": 3733,
+  "checked": 2000,
+  "pass_correct": 0,
+  "median_comp_pairs": 3.0,
+  "share_with_comp_overlap": 0.921,
+  "median_rod_hits": 3.0,
+  "median_panel_hits": 15.0,
+  "median_deepest_comp_overlap_m": 0.07650345127179144
+ },
+ "genetic_algorithm_s1": {
+  "evals": 31564,
+  "old_feasible": 4138,
+  "checked": 2000,
+  "pass_correct": 0,
+  "median_comp_pairs": 3.0,
+  "share_with_comp_overlap": 0.9405,
+  "median_rod_hits": 4.0,
+  "median_panel_hits": 13.0,
+  "median_deepest_comp_overlap_m": 0.08000000000000004
+ },
+ "intelligent_mutation_ga_s0": {
+  "evals": 31420,
+  "old_feasible": 0,
+  "checked": 0,
+  "pass_correct": 0,
+  "median_comp_pairs": null,
+  "share_with_comp_overlap": null,
+  "median_rod_hits": null,
+  "median_panel_hits": null,
+  "median_deepest_comp_overlap_m": null
+ },
+ "intelligent_mutation_ga_s1": {
+  "evals": 26026,
+  "old_feasible": 10285,
+  "checked": 2000,
+  "pass_correct": 0,
+  "median_comp_pairs": 4.0,
+  "share_with_comp_overlap": 1.0,
+  "median_rod_hits": 2.0,
+  "median_panel_hits": 16.0,
+  "median_deepest_comp_overlap_m": 0.1
+ },
+ "random_search_s0": {
+  "evals": 32000,
+  "old_feasible": 29,
+  "checked": 29,
+  "pass_correct": 0,
+  "median_comp_pairs": 3.0,
+  "share_with_comp_overlap": 0.9310344827586207,
+  "median_rod_hits": 5.0,
+  "median_panel_hits": 18.0,
+  "median_deepest_comp_overlap_m": 0.07905159326090316
+ },
+ "random_search_s1": {
+  "evals": 32000,
+  "old_feasible": 32,
+  "checked": 32,
+  "pass_correct": 0,
+  "median_comp_pairs": 3.0,
+  "share_with_comp_overlap": 0.96875,
+  "median_rod_hits": 3.0,
+  "median_panel_hits": 16.0,
+  "median_deepest_comp_overlap_m": 0.08837823048271545
+ },
+ "rl_informed_env_s0": {
+  "evals": 32000,
+  "old_feasible": 3306,
+  "checked": 2000,
+  "pass_correct": 0,
+  "median_comp_pairs": 230.0,
+  "share_with_comp_overlap": 1.0,
+  "median_rod_hits": 60.0,
+  "median_panel_hits": 64.0,
+  "median_deepest_comp_overlap_m": 0.17479651987431688
+ },
+ "rl_informed_env_s1": {
+  "evals": 32000,
+  "old_feasible": 141,
+  "checked": 141,
+  "pass_correct": 0,
+  "median_comp_pairs": 167.0,
+  "share_with_comp_overlap": 1.0,
+  "median_rod_hits": 29.0,
+  "median_panel_hits": 57.0,
+  "median_deepest_comp_overlap_m": 0.2122268842498402
+ },
+ "warm_start_ga_s0": {
+  "evals": 31564,
+  "old_feasible": 4159,
+  "checked": 2000,
+  "pass_correct": 0,
+  "median_comp_pairs": 3.0,
+  "share_with_comp_overlap": 0.941,
+  "median_rod_hits": 3.0,
+  "median_panel_hits": 13.5,
+  "median_deepest_comp_overlap_m": 0.08008664882506705
+ },
+ "warm_start_ga_s1": {
+  "evals": 31564,
+  "old_feasible": 3822,
+  "checked": 2000,
+  "pass_correct": 0,
+  "median_comp_pairs": 2.0,
+  "share_with_comp_overlap": 0.9145,
+  "median_rod_hits": 3.0,
+  "median_panel_hits": 12.0,
+  "median_deepest_comp_overlap_m": 0.0742937993767723
+ },
+ "warm_start_intelligent_mutation_ga_s0": {
+  "evals": 23679,
+  "old_feasible": 21528,
+  "checked": 2000,
+  "pass_correct": 0,
+  "median_comp_pairs": 381.0,
+  "share_with_comp_overlap": 1.0,
+  "median_rod_hits": 307.0,
+  "median_panel_hits": 63.0,
+  "median_deepest_comp_overlap_m": 0.20817724863998804
+ },
+ "warm_start_intelligent_mutation_ga_s1": {
+  "evals": 23661,
+  "old_feasible": 16117,
+  "checked": 2000,
+  "pass_correct": 0,
+  "median_comp_pairs": 402.0,
+  "share_with_comp_overlap": 1.0,
+  "median_rod_hits": 172.0,
+  "median_panel_hits": 34.0,
+  "median_deepest_comp_overlap_m": 0.2563695885437792
+ }
+}
