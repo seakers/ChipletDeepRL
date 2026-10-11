@@ -75,6 +75,26 @@ has the meeting notes and change log; this file has the context, rules and mista
   before telling Oliver something is running or done.
 - Each python run is two processes (venv launcher + child).
 
+### Keeping long runs alive (what worked Oct 10-11)
+
+- Start runs detached (`nohup python ... > log 2>&1 &`): Claude Code's low-memory reaper kills
+  background shells, not detached processes. Add a separate `run_in_background` waiter for the
+  notification; if it gets reaped, the runs continue (check by process list).
+- Keep-awake for every unattended run (`keepawake.ps1 -Pattern`), started only if none is
+  running (exclude `$PID` in the check).
+- BelowNormal for both processes of each run; small `OMP_NUM_THREADS`/`MKL_NUM_THREADS`.
+- Store only what you need while running (run_idetc.py keeps only the designs the old test
+  accepts) and save each stage to its own file as soon as it ends.
+- Smoke-test 2-3 epochs per method first for time and memory; check free RAM against the 8 GB
+  buffer before adding runs.
+- When RAM is tight, sequence runs with a small detached queue script that waits for run A's
+  processes to exit, then starts run B, sets its priority and restarts the keep-awake.
+  Copy a dead run's log before the restart overwrites it.
+- Post-process in parallel per file at low priority; sample large sets (2,000 per file, fixed
+  RNG); cache expensive HVs (`figures/hv_cache.json`).
+- Old commits run in their own worktree; `CUDA_VISIBLE_DEVICES=-1` (not empty) to force CPU.
+- The session scratchpad is temporary: copy results and page sources into the repo.
+
 ## Code state (latest commit 1f421d2)
 
 - Evaluator fixes (98087c3), PPO fixes behind `legacy_ppo` (README), fast overlaps,
