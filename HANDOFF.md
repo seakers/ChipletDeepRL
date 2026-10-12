@@ -177,3 +177,15 @@ when the same arm name appears in several tags. `cpu` is round 1 on the old refe
    model if he picks one; sharing code (Oliver decides how; never push yourself).
 3. Housekeeping when convenient: prune scratchpad worktrees; decide whether to commit
    `experiments/data/idetc_designs` and `experiments/technical_notes`.
+
+## Oct 12 additions
+
+- Report for Alex: https://claude.ai/artifact/MqFhNh8yDeuLvk12FiGg2W (shared by link), source
+  `experiments/report/index.html`, figures published as `figs/*.png`.
+- All seven IDETC methods now run on the corrected code (`idetc_c`, 4 seeds,
+  `experiments/run_idetc_methods.sh`): PPO and design repair find nothing; IM GA 0.583 is the best.
+- Alex asked whether constructor and repair should count as evaluations. `utils/cost_counter.py`
+  counts the work; `experiments/cost_models.py` gives HV under four cost models (RESULTS.md).
+  Structure mutation is best under all four. Runs are deterministic per seed, so counters can be
+  added by rerunning the same seeds.
+- GPU: Oliver wants it used hard when speed matters (several jobs, no 50% duty cap); keep ~8 GB RAM.
