@@ -3,6 +3,7 @@ import torch
 from torch import nn
 
 from utils.construct import EMPTY, stack, place_clear, partial_costs, random_structure
+from utils.cost_counter import COUNTS
 from optimization.construct_search import grid_outputs
 
 
@@ -47,6 +48,8 @@ def choose(rng, net, feats, prior):
 
 def build_design(ev, rng, struct_net, place_net, w, scale, m=4, S=8, prior_b=0.0):
     """One build. Returns (design or None, decisions); decisions are (net, feats, prior, choice, logp)."""
+    COUNTS['constructions'] += 1
+    COUNTS['structure_attempts'] += 1
     cands = [random_structure(ev, rng) for _ in range(S)]
     feats = [structure_features(s, w) for s in cands]
     no_prior = np.zeros(S, dtype=np.float32)

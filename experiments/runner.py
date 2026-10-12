@@ -31,6 +31,7 @@ from utils.component_list import getComponents, create_varied_components, getSci
 from utils.component_classes import StructPanel
 from utils.fast_evaluation import FastChipletDesign
 from utils.hypervolume_utils import is_pareto_efficient
+from utils import cost_counter
 
 
 def _methods():
@@ -196,11 +197,22 @@ def run_job(job, args, overrides, max_values):
     violated = []
     call_times = []
     evaluate = eval_function.evaluate
+    # work outside full evaluations (utils/cost_counter.py); eval_pairs = overlap tests done inside them
+    C = cost_counter.COUNTS
+    cost_counter.reset()
+    eval_pairs = [0]
+    cost_trace = []
 
     def counting_evaluate(x):
+        before = C['pair_tests']
         out = evaluate(x)
+        eval_pairs[0] += C['pair_tests'] - before
         violated.append(bool(out[1]))
         call_times.append(time.time() - t0)
+        n = len(violated)
+        if n % 50 == 0 or n == 1:
+            cost_trace.append([n, C['pair_tests'] - eval_pairs[0], C['partial_costs'], C['constructions'],
+                               C['structure_attempts'], C['repairs']])
         return out
     eval_function.evaluate = counting_evaluate
 
@@ -215,8 +227,10 @@ def run_job(job, args, overrides, max_values):
     raw_obj, raw_structs = raw_front(out[1], max_values, out[0])
     # raw fronts of the first n evaluations, for exact HV over the run (the grid curve is coarse)
     n_all = len(out[1])
-    raw_curve = {n: raw_front(out[1][:n], max_values)[0]
-                 for n in (500, 1000, 2000, 4000, 8000, 16000, 32000) if n < n_all}
+    # quarter-octave steps from 250, so HV can be read at budgets charged under other cost models
+    steps = sorted({int(round(250 * 2 ** (k / 4))) for k in range(33)} | {500, 1000, 2000, 4000, 8000, 16000, 32000}
+                   | {8, 16, 24, 32, 48, 64, 96, 128, 192})
+    raw_curve = {n: raw_front(out[1][:n], max_values)[0] for n in steps if n < n_all}
     return {
         'final_hv': float(hypervolumes[-1]) if hypervolumes else 0.0,
         'nfe': int(out[5]),
@@ -233,6 +247,9 @@ def run_job(job, args, overrides, max_values):
         'first_feasible_nfe': next((k + 1 for k, v in enumerate(violated) if not v), None),
         'hv_curve': checkpoints(hypervolumes),
         'wall_s': round(wall, 1),
+        # [evaluations, aux overlap pair tests, partial-cost calls, constructions, structure attempts, repairs]
+        'cost_trace': cost_trace,
+        'costs': dict(C, eval_pair_tests=eval_pairs[0], evaluations=len(violated)),
         'params': {k: v for k, v in params.items() if k not in ('date_str', 'save_path')},
     }
 
@@ -251,6 +268,7 @@ def main():
     ap.add_argument('--shard', type=int, default=0)
     ap.add_argument('--nshards', type=int, default=1)
     ap.add_argument('--shard-label', help='output file suffix instead of the shard number, for extra workers')
+    ap.add_argument('--only-arm', help='run just this arm from the arms file')
     args = ap.parse_args()
 
     if args.arms:
@@ -260,6 +278,8 @@ def main():
         arms = [{'name': m, 'method': m} for m in args.methods.split(',')]
     else:
         ap.error('give --methods or --arms')
+    if args.only_arm:
+        arms = [a for a in arms if a['name'] == args.only_arm]
     methods = [a['method'] for a in arms]
     unknown = [m for m in methods if m not in _methods()]
     if unknown:

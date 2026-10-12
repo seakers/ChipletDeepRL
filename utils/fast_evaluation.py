@@ -2,6 +2,7 @@ import numpy as np
 
 from utils.evaluation import Chiplet_Configuration_Design
 from utils.geometry import boxes_vs_plate
+from utils.cost_counter import COUNTS
 
 
 def sat_overlap(h1, c1, A1, h2, c2, A2):
@@ -45,6 +46,7 @@ class FastChipletDesign(Chiplet_Configuration_Design):
         c = np.asarray(locations, dtype=float)
         A = np.asarray(orientations, dtype=float)
         overlap_ind = np.zeros(n, dtype=bool)
+        COUNTS['pair_tests'] += n * (n - 1) // 2
 
         # component-component, marking the later index like the original
         i, j = np.triu_indices(n, 1)
@@ -57,6 +59,7 @@ class FastChipletDesign(Chiplet_Configuration_Design):
     def _hits_structure(self, h, c, A, struct_dims, struct_locs, struct_orients, struct_polys):
         # (N,) bool: which boxes overlap a structure panel (boxes, or polygon plates)
         hit_any = np.zeros(len(h), dtype=bool)
+        COUNTS['pair_tests'] += len(h) * len(struct_dims)
         polys = struct_polys if struct_polys is not None else [None] * len(struct_dims)
         boxes = [k for k, poly in enumerate(polys) if poly is None]
         if boxes:
@@ -96,6 +99,7 @@ class FastChipletDesign(Chiplet_Configuration_Design):
 
     def boxes_clear(self, new, others):
         """True if no box in `new` overlaps a box in `others` (both (h, c, A) tuples)."""
+        COUNTS['pair_tests'] += len(new[0]) * len(others[0])
         if len(others[0]) == 0:
             return True
         # only boxes whose bounding spheres touch can overlap

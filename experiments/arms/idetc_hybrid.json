@@ -1,0 +1,5 @@
+[
+ {"name": "wsga", "method": "wsga", "set": {"learning_rate": 0.0001}},
+ {"name": "imga", "method": "imga", "set": {"learning_rate": 0.0001}},
+ {"name": "wsimga", "method": "wsimga", "set": {"learning_rate": 0.0001}}
+]

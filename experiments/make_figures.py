@@ -166,11 +166,15 @@ def row_headers(ax, rows, x):
 
 
 def method_rows():
+    # idetc_c: the IDETC methods chained per seed as in opt_main, 110a859's PPO settings (lr 1e-4)
     old = [
         ('random search', r1('cpu', 'random'), C['base']),
-        ('synthesis PPO', r1('gpu', 'ppo'), C['ppo']),
-        ('synthesis PPO + our repair', r1('gpu', 'ppo_repair'), C['ppo']),
+        ('synthesis PPO', final([('idetc_c', 'ppo')]), C['ppo']),
+        ('design repair PPO', final([('idetc_c', 'repair')]), C['ppo']),
         ("Alex's GA", r1('cpu', 'lab'), C['base']),
+        ('warm-start GA', final([('idetc_c', 'wsga')]), C['base']),
+        ('intelligent-mutation GA', final([('idetc_c', 'imga')]), C['base']),
+        ('warm-start intelligent-mutation GA', final([('idetc_c', 'wsimga')]), C['base']),
     ]
     new = [
         ('GA + structure mutation', final([('r3', 'struct_0.2'), ('r6_seeds', 'struct_0.2')]), C['struct']),
@@ -186,8 +190,9 @@ def method_rows():
 
 def fig_methods():
     old, new = method_rows()
-    rows = [('Ours', None, None)] + new + [('From the IDETC paper', None, None)] + old
-    fig, axes = plt.subplots(1, 2, figsize=(10.4, 5.2), sharey=True, gridspec_kw={'width_ratios': [1, 1.15]})
+    rows = ([('Ours', None, None)] + new + [('From the IDETC paper', None, None)] + old
+            + [('Mixed', None, None), ('synthesis PPO + our repair', r1('gpu', 'ppo_repair'), C['ppo'])])
+    fig, axes = plt.subplots(1, 2, figsize=(10.4, 5.8), sharey=True, gridspec_kw={'width_ratios': [1, 1.15]})
     for ax, (lo, hi), labels in [(axes[0], (0, 0.85), False), (axes[1], (0.72, 0.82), True)]:
         ax.set_xlim(lo, hi)
         hv_rows(ax, rows, lo, hi, np.random.default_rng(1), labels=labels)
@@ -196,8 +201,9 @@ def fig_methods():
     axes[0].set_title('full scale', loc='left', fontsize=10, color=MUTED)
     axes[1].set_title('zoomed', loc='left', fontsize=10, color=MUTED)
     fig.supxlabel('hypervolume at 16,000 evaluations (IDETC reference); dots = seeds, black = mean ± 1 SD', fontsize=9.5, color=INK)
-    fig.text(0.01, -0.04, 'All on the corrected code. Ours: 10 seeds (0-9) or 4 (0-3; the plain GA averages 0.784 on those). '
-             'IDETC-paper methods: round 1 runs (seeds 0-7; PPO 1 or 3 seeds).', fontsize=8.5, color=MUTED)
+    fig.text(0.01, -0.07, 'All on the corrected code. Ours: 10 seeds (0-9) or 4 (0-3; the plain GA averages 0.784 on those). '
+             "IDETC-paper methods: 4 seeds (0-3), chained per seed as in 110a859's opt_main with its PPO settings;\n"
+             "random search and Alex's GA: round 1 (seeds 0-7). Synthesis PPO + our repair: 3 seeds.", fontsize=8.5, color=MUTED)
     fig.suptitle('Equal evaluations (16,000): methods from the IDETC paper against ours', x=0.01, y=1.0, ha='left', fontsize=11, color=INK)
     save(fig, 'methods_16k.png')
 
@@ -367,6 +373,70 @@ def fig_transfer():
     save(fig, 'structure_transfer.png')
 
 
+def fig_cost_models():
+    # data/cost_models.json from cost_models.py: HV at a 16,000 budget when work outside evaluations is charged
+    d = json.load(open(os.path.join(ROOT, 'experiments', 'data', 'cost_models.json')))
+    lab = r1('cpu', 'lab')
+    d['lab'] = {m: {str(k): v for k, v in lab.items()} for m in ('evaluations', 'per call', 'constraint', 'objectives')}
+    d['lab']['rates'] = {m: 1.0 for m in d['lab'] if m != 'rates'}
+    rows = [('Ours', None, None),
+            ('GA + structure mutation', 'struct_0.2', C['struct']),
+            ('GA + immigrants', 'immig_0.2', C['immig']),
+            ('GA, constructed start + repair', 'comp_construct_repair', C['base']),
+            ('greedy4 constructor*', 'greedy4', C['greedy']),
+            ('constructive PPO*', 'cppo', C['ppo']),
+            ('constructed sampling', 'construct_only', C['construct']),
+            ("Alex's GA + our repair", 'lab_repair', C['base']),
+            ('From the IDETC paper', None, None),
+            ('intelligent-mutation GA', 'idetc_imga', C['base']),
+            ('warm-start intelligent-mutation GA', 'idetc_wsimga', C['base']),
+            ("Alex's GA", 'lab', C['base']),
+            ('warm-start GA', 'idetc_wsga', C['base']),
+            ('synthesis PPO', 'idetc_ppo', C['ppo']),
+            ('design repair PPO', 'idetc_repair', C['ppo'])]
+    panels = [('evaluations', 'Evaluations only'),
+              ('per call', 'Alex\'s rule: + 1 per\nconstruction or repair'),
+              ('constraint', 'Overlap checks charged\n(full-design equivalents)'),
+              ('objectives', 'Partial objectives charged\n(1 evaluation each)')]
+    lo, hi = 0.72, 0.855
+    n = len(rows)
+    fig, axes = plt.subplots(1, 4, figsize=(13.5, 6.0), sharey=True)
+    for ax, (m, title) in zip(axes, panels):
+        ax.set_xlim(lo, hi)
+        for i, (name, arm, col) in enumerate(rows):
+            y = n - 1 - i
+            if arm is None:
+                continue
+            v = np.array([x for x in d[arm][m].values() if x is not None], dtype=float)
+            rate = d[arm]['rates'][m]
+            tag = f'×{rate:.1f}' if rate < 10 else f'×{rate:.0f}'
+            if len(v) == 0 or v.max() == 0:
+                ax.text(lo + 0.002, y, 'no feasible design', va='center', fontsize=7.5, color=C['construct'])
+                continue
+            mu, sd = v.mean(), (v.std(ddof=1) if len(v) > 1 else 0.0)
+            if mu < lo:
+                ax.text(lo + 0.002, y, f'< {mu:.3f}', va='center', fontsize=7.5, color=INK)
+                continue
+            ax.barh(y, mu - lo, left=lo, color=col, alpha=0.25, height=0.7)
+            ax.scatter(v, y + np.linspace(-0.18, 0.18, len(v)), s=9, color=col, zorder=3, lw=0)
+            ax.plot([mu - sd, mu + sd], [y, y], color=INK, lw=1.2, zorder=4)
+            ax.plot([mu, mu], [y - 0.22, y + 0.22], color=INK, lw=1.2, zorder=4)
+            ax.text(hi - 0.001, y, f'{mu:.3f} {tag}', va='center', ha='right', fontsize=7.5, color=INK)
+        ax.set_title(title, loc='left', fontsize=9.5, color=INK)
+        ax.grid(axis='y', visible=False)
+        ax.set_xticks([0.72, 0.76, 0.80])
+    row_axis(axes[0], [(r[0], r[1] and True, r[2]) for r in rows])
+    row_headers(axes[0], [(r[0], r[1] and True, r[2]) for r in rows], -0.02)
+    fig.supxlabel('hypervolume when the total cost reaches 16,000 evaluations (IDETC reference); ×k = cost per evaluation; '
+                  'dots = seeds, black = mean ± 1 SD', fontsize=9, color=INK)
+    fig.text(0.01, -0.06, 'Seeds 0-3 (Alex\'s GA: round 1, seeds 0-7). * greedy4 and constructive PPO were not rerun: their per-design '
+             'cost comes from short runs (and logged build failures),\napplied to the earlier runs; greedy4 uses seeds 0-1 where '
+             'the budget allows more than 256 designs. IDETC-paper methods do no construction or overlap repair, so they cost the same in every panel.',
+             fontsize=8, color=MUTED)
+    fig.suptitle('Charging the constructor, repair and partial objectives as evaluations', x=0.01, y=1.0, ha='left', fontsize=11, color=INK)
+    save(fig, 'cost_models.png')
+
+
 def fig_idetc():
     # experiments/probes/idetc: the IDETC commit's own methods and settings, re-checked with a correct overlap test
     d = json.load(open(os.path.join(ROOT, 'experiments', 'data', 'idetc_recheck.json')))
@@ -402,7 +472,7 @@ def fig_idetc():
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)
     try:
-        for f in [fig_feasibility, fig_methods, fig_old_vs_new, fig_curves, fig_time, fig_cppo, fig_warmstart, fig_transfer, fig_idetc]:
+        for f in [fig_feasibility, fig_methods, fig_old_vs_new, fig_curves, fig_time, fig_cppo, fig_warmstart, fig_transfer, fig_idetc, fig_cost_models]:
             f()
     finally:
         json.dump(_cache, open(CACHE_PATH, 'w'))

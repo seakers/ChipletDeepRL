@@ -1,5 +1,7 @@
 import numpy as np
 
+from utils.cost_counter import COUNTS
+
 
 def valid_panels(ev, x, i):
     base = {0: 5, 1: 6, 2: 8}[int(x[0])]
@@ -22,6 +24,7 @@ def place_clear(ev, x, i, others, rng, tries):
     """Try random placements of component i until it clears `others` and its own rod.
     Leaves x[5+5i:10+5i] at the last try and returns that component's boxes, or None."""
     for _ in range(tries):
+        COUNTS['placement_tries'] += 1
         x[5 + 5 * i:10 + 5 * i] = random_component_genes(ev, x, i, rng)
         ev.place_component(i, x)
         if ev.component_list[i].off_panel:
@@ -55,7 +58,9 @@ def construct_feasible(ev, rng, structure=None, tries=500, max_structures=20, di
     rejecting placements that overlap. Random structure unless one is given.
     ev must be a FastChipletDesign. Returns the design or None.
     """
+    COUNTS['constructions'] += 1
     for _ in range(max_structures):
+        COUNTS['structure_attempts'] += 1
         if structure is None:
             ds = ev.design_space
             s = random_structure(ev, rng, dim_max)
@@ -81,6 +86,7 @@ def repair_overlaps(ev, x, rng, tries=20):
     Re-place every component the evaluator marks as overlapping, keeping the rest fixed.
     Components are re-placed one at a time against everything else.
     """
+    COUNTS['repairs'] += 1
     x = list(x)
     ev.get_structural_panels(x)
     ev.get_components(x)
@@ -121,6 +127,7 @@ def repair_overlaps(ev, x, rng, tries=20):
 def partial_costs(ev, placed_idx):
     """cm, off-axis inertia, on-axis inertia and wire cost of the components placed so far.
     Thermal is left out: it depends only on the shell area."""
+    COUNTS['partial_costs'] += 1
     comps = [ev.component_list[k] for k in placed_idx]
     struct = [p for p in ev.structure_panels if p is not None]
     dims = [c.dimensions for c in comps]
@@ -143,7 +150,9 @@ def construct_greedy(ev, rng, max_obj, m=4, tries=500, max_structures=20, struct
     so the wire cost is defined from the start.
     """
     scale = np.asarray(max_obj[:4], dtype=float)
+    COUNTS['constructions'] += 1
     for _ in range(max_structures):
+        COUNTS['structure_attempts'] += 1
         if structure is None:
             s = random_structure(ev, rng, dim_max)
         else:

@@ -88,9 +88,10 @@ footer { margin-top: 64px; border-top: 1px solid var(--rule); padding-top: 16px;
   <ul>
     <li>Before <code>ab59dbe</code> (Aug 6), the separating-axis test reported two boxes as clear whenever they had a pair of parallel edges. Every component has an axis along its panel's normal, so pairs on the same or parallel panels were never really tested. <code>110a859</code>, which produced the IDETC results, has this test.</li>
     <li>We reran <code>110a859</code>'s own seven methods with its own settings (2 seeds). Its test called 67,520 designs feasible. Of the 16,432 we re-checked with the corrected test, <b>none</b> pass. The GA-type designs typically have 2–4 overlapping component pairs, 7–10 cm deep. The PPO-based designs pile components together: 167–402 of 820 pairs overlap.</li>
-    <li>On the corrected evaluator, 0 of 16,000 random designs are feasible. Random search and synthesis PPO find no feasible design, and the rl_moo GA reaches HV 0.356 ± 0.036 at 16,000 evaluations.</li>
+    <li>We also ran all seven IDETC methods on the corrected evaluator (4 seeds, chained per seed as in <code>opt_main</code>). 0 of 16,000 random designs are feasible. Random search, synthesis PPO and design repair PPO find no feasible design. At 16,000 evaluations the GAs reach HV 0.326 (warm-start GA) to 0.583 (intelligent-mutation GA), and the rl_moo GA 0.356.</li>
     <li>Three additions make the search work: a start from designs that are feasible by construction, a step that repairs overlaps, and a mutation that keeps structures diverse. With all three, the GA reaches 0.793 ± 0.009 at 16,000 evaluations (10 seeds) and 0.813 at 64,000.</li>
     <li>Constructive PPO, which builds each design from feasible choices, is the only RL variant that helped. It gains +0.011 over its own non-learned starting rule at 8,000 evaluations (4 of 4 seeds, p = 0.05). It ties the best GA per evaluation but is about 30× slower per minute.</li>
+    <li>Our methods also use a constructor and an overlap repair, which are not counted as evaluations. Section 4 also charges them under three cost models. Structure mutation stays the best method in every one (0.786–0.800), and every method of ours stays above every IDETC method.</li>
     <li>Separately, we fixed six geometry errors in the evaluator and seven in the PPO code (sections 5 and 6). All numbers in this report use the corrected code.</li>
   </ul>
   <ol class="toc">
@@ -113,6 +114,7 @@ footer { margin-top: 64px; border-top: 1px solid var(--rule); padding-top: 16px;
   <p><b>Problem.</b> The IDETC configuration has 41 components and 210 variables: 5 structure genes (shell shape, x/y/z size, shelf count) and 5 per component (panel, x and y position on 101 steps, face down on 6 choices, rotation on 36 steps). There are five minimized objectives: center-of-mass offset, off-axis inertia, on-axis inertia, wire length and thermal. The constraint is no overlap between components, panels and pointing keep-out rods.</p>
   <p><b>Code.</b> rl_moo with the Aug 6 overlap test (<code>ab59dbe</code>) and our evaluator fixes (<code>98087c3</code>, section 5). The thermal model is unchanged: it depends only on the shell's outside area and the fixed total heat.</p>
   <p><b>Hypervolume.</b> We compute HV from each run's raw final front by Monte Carlo, using 200,000 fixed uniform points in the normalized objective box (standard error about 0.001). Objectives are divided by the reference point, and points beyond it are dropped. The reference is 1.5× the per-objective maximum over 16,000 random designs, following the rule in the IDETC paper (the code at <code>110a859</code> uses 2.0×). We did not use <code>HypervolumeGrid</code>. With 21 cells per axis, its step is 0.05, and on this reference the fronts occupy very few cells. For example, front thermal values from 0.070 to 0.083 all fall in one cell, so the grid HV stops changing while the exact HV is still rising.</p>
+  <p><b>Evaluations.</b> An evaluation is one call of the evaluator on a complete design: its geometry, the 5 objectives and the full constraint check. Unless noted, budgets count only these. The constructor and overlap repair (section 7) run overlap checks of their own, and greedy4 and constructive PPO also compute partial objectives for candidate placements. None of that is counted as an evaluation in the main results. Section 4 shows the results when it is.</p>
   <p><b>Runs.</b> Unless noted: 16,000 evaluations, population 64, 8 elites. "±" is one standard deviation across seeds, and <i>n</i> is the number of seeds. p-values are paired t-tests over matched seeds.</p>
 </section>
 
@@ -181,10 +183,11 @@ footer { margin-top: 64px; border-top: 1px solid var(--rule); padding-top: 16px;
 
 <section id="compare" class="col">
   <h2><span class="n">4</span>IDETC-paper methods against ours, on the corrected evaluator</h2>
-  <p>Round 1 of our experiments (Oct 5, 8 seeds, one commit) ran the rl_moo GA, random search and NSGA-III next to our methods, all on the corrected evaluator. The rl_moo GA is pygad with NSGA-II selection, 16 parents mating, and random mutation with per-gene probability 0.1. Its settings match <code>110a859</code>'s, plus the constraint-violation term in the fitness that <code>05eb825</code> added. Synthesis PPO ran on the same code with our PPO fixes, on 1 seed alone and on 3 seeds with our overlap repair applied to each sample.</p>
+  <p>Round 1 of our experiments (Oct 5, 8 seeds, one commit) ran the rl_moo GA, random search and NSGA-III next to our methods, all on the corrected evaluator. The rl_moo GA is pygad with NSGA-II selection, 16 parents mating, and random mutation with per-gene probability 0.1. Its settings match <code>110a859</code>'s, plus the constraint-violation term in the fitness that <code>05eb825</code> added. Synthesis PPO with our overlap repair applied to each sample ran on 3 seeds.</p>
+  <p>The other IDETC methods ran on Oct 12, 4 seeds each (0–3), chained per seed the way <code>110a859</code>'s <code>opt_main</code> does it. Synthesis PPO and design repair PPO train first. The warm-start GA then starts from the synthesis policy's samples, the intelligent-mutation GA mutates with the repair policy, and the warm-start intelligent-mutation GA uses both. PPO settings are <code>110a859</code>'s (lr 1e-4, clip 0.2, λ 0.95, mini-batch 64), with our PPO fixes, at 16,000 evaluations per method.</p>
   <figure>
-    <img src="figs/methods_16k.png" alt="Horizontal bars of hypervolume at 16,000 evaluations with seed dots and standard deviation lines, on a full scale and a zoomed scale. Our methods score 0.772 to 0.799; synthesis PPO with repair 0.613; the rl_moo GA 0.356; random search and synthesis PPO find no feasible design.">
-    <figcaption><b>Figure 5.</b> HV at 16,000 evaluations. Dots are seeds, and the black line is the mean ± 1 SD. The left panel is full scale; the right panel zooms in on our methods. Our 10-seed methods use seeds 0–9, and our 4-seed methods use seeds 0–3 (the plain GA averages 0.784 on those). The IDETC-paper methods are round 1 runs.</figcaption>
+    <img src="figs/methods_16k.png" alt="Horizontal bars of hypervolume at 16,000 evaluations with seed dots and standard deviation lines, on a full scale and a zoomed scale. Our methods score 0.772 to 0.799. IDETC methods: intelligent-mutation GA 0.583, warm-start intelligent-mutation GA 0.411, rl_moo GA 0.356, warm-start GA 0.326; random search, synthesis PPO and design repair PPO find no feasible design. Synthesis PPO with our repair 0.613.">
+    <figcaption><b>Figure 5.</b> HV at 16,000 evaluations. Dots are seeds, and the black line is the mean ± 1 SD. The left panel is full scale; the right panel zooms in on our methods. Our 10-seed methods use seeds 0–9, and our 4-seed methods use seeds 0–3 (the plain GA averages 0.784 on those). IDETC-paper methods: 4 seeds (0–3); random search and the rl_moo GA are round 1 runs (seeds 0–7).</figcaption>
   </figure>
   <p>Figure 6 adds one piece at a time to the rl_moo GA, all within round 1, so every row is directly comparable.</p>
   <figure>
@@ -202,10 +205,15 @@ footer { margin-top: 64px; border-top: 1px solid var(--rule); padding-top: 16px;
     <tbody>
       <tr class="grp"><td colspan="3">From the IDETC paper (corrected evaluator)</td></tr>
       <tr><td>Random search</td><td class="num zero">no feasible design</td><td class="num">8</td></tr>
-      <tr><td>Synthesis PPO, our settings / IDETC settings</td><td class="num zero">no feasible design</td><td class="num">1 / 1</td></tr>
-      <tr><td>Synthesis PPO + our repair</td><td class="num">0.613 ± 0.050</td><td class="num">3</td></tr>
-      <tr><td>Synthesis PPO + our repair, IDETC settings (lr 3e-4, clip 0.05, λ 0.9, mini-batch 16)</td><td class="num">0.601</td><td class="num">1</td></tr>
+      <tr><td>Synthesis PPO (informed state)</td><td class="num zero">no feasible design</td><td class="num">4</td></tr>
+      <tr><td>Design repair PPO</td><td class="num zero">no feasible design</td><td class="num">4</td></tr>
       <tr><td>rl_moo GA</td><td class="num">0.356 ± 0.036</td><td class="num">8</td></tr>
+      <tr><td>Warm-start GA</td><td class="num">0.326 ± 0.063</td><td class="num">4</td></tr>
+      <tr><td>Intelligent-mutation GA</td><td class="num">0.583 ± 0.090</td><td class="num">4</td></tr>
+      <tr><td>Warm-start intelligent-mutation GA</td><td class="num">0.411 ± 0.286</td><td class="num">4</td></tr>
+      <tr class="grp"><td colspan="3">Mixed</td></tr>
+      <tr><td>Synthesis PPO + our repair</td><td class="num">0.613 ± 0.050</td><td class="num">3</td></tr>
+      <tr><td>Synthesis PPO + our repair, IDETC paper's table settings (lr 3e-4, clip 0.05, λ 0.9, mini-batch 16)</td><td class="num">0.601</td><td class="num">1</td></tr>
       <tr class="grp"><td colspan="3">Other baseline</td></tr>
       <tr><td>NSGA-III (pymoo, SBX + polynomial mutation)</td><td class="num">0.401 ± 0.044</td><td class="num">8</td></tr>
       <tr class="grp"><td colspan="3">Ours</td></tr>
@@ -220,11 +228,44 @@ footer { margin-top: 64px; border-top: 1px solid var(--rule); padding-top: 16px;
   </table>
   </div>
   <p>Structure mutation, immigrants and the oracle each beat the plain GA on 8–9 of 10 seeds (paired p 0.003–0.013), and they cannot be told apart from each other (p &gt; 0.7).</p>
-  <div class="note">We have not run design repair PPO, warm-start GA, the intelligent-mutation GA or the warm-start intelligent-mutation GA on the corrected evaluator. All four start from policies trained by synthesis or repair PPO. On the corrected test those policies never see a feasible design, so the warm-start GAs would start from infeasible designs, much like the rl_moo GA from random ones. We can run them if you want the full set.</div>
+  <p><b>The IDETC methods on the corrected evaluator.</b></p>
+  <ul>
+    <li><b>Synthesis and design repair PPO</b> find no feasible design on any seed. The warm-start GA therefore starts from infeasible PPO samples and ends close to the rl_moo GA from random starts (0.326 against 0.356; 60–92 feasible evaluations per run).</li>
+    <li><b>The intelligent-mutation GA is the best of them</b>, at 0.583 ± 0.090. Its repair policy also never saw a feasible design in training, but its reward includes the fraction of overlapping components, so it learned edits that reduce overlap. That steers children toward feasibility: about 60% of its evaluations are feasible.</li>
+    <li><b>The warm-start intelligent-mutation GA</b> scores 0.43–0.61 on three seeds and finds nothing feasible on seed 2, hence its large spread.</li>
+    <li>The intelligent-mutation GAs re-evaluate copies of their elites, so most feasible evaluations are repeats (in one check, 1,366 feasible evaluations were 63 distinct designs). They also store a reference to the population row rather than a copy, so a stored design can differ from the one evaluated. Objectives and HV are unaffected.</li>
+  </ul>
+
+  <h3>Charging construction, repair and partial objectives</h3>
+  <p>On this problem an evaluation takes about 4 ms. With an expensive evaluator, the work our methods do outside evaluations could matter, so we counted it. Every run now records three things:</p>
+  <ul>
+    <li>constructor and repair calls;</li>
+    <li>box-pair overlap tests outside evaluations;</li>
+    <li>partial-objective calls.</li>
+  </ul>
+  <p>One full evaluation's constraint check is about 2,300 pair tests, so overlap work can be expressed in full-design equivalents. A construction costs about 3.3 of them, because it tries about 600 placements to fit 41 components. Rerunning our GA arms and constructed sampling with the same seeds reproduced the earlier HVs exactly (the runs are deterministic), so these counts belong to the reported runs. greedy4 and constructive PPO were too slow to rerun. Their per-design costs come from short runs, plus the build failures logged in the constructive PPO runs.</p>
+  <figure>
+    <img src="figs/cost_models.png" alt="Four panels of hypervolume when the total cost reaches 16,000 evaluations under four cost models. Structure mutation scores 0.800, 0.790, 0.786 and 0.800; greedy4 and constructive PPO drop to about 0.75 when partial objectives are charged; every IDETC method stays at or below 0.583.">
+    <figcaption><b>Figure 7.</b> HV when the total cost reaches 16,000 evaluations, under four cost models; ×k is the cost per evaluation.
+      <ol>
+        <li>Evaluations only.</li>
+        <li>Each constructor or repair call costs one evaluation.</li>
+        <li>Overlap checks outside evaluations are charged in full-design equivalents.</li>
+        <li>Each partial-objective call costs one evaluation.</li>
+      </ol>
+      Seeds 0–3. The IDETC methods do no construction or overlap repair, so they cost the same in every panel. Design repair PPO already counts every edit as an evaluation.</figcaption>
+  </figure>
+  <ul>
+    <li><b>Structure mutation is the best method under every cost model:</b> 0.800, 0.790, 0.786 and 0.800 on seeds 0–3. Our GAs compute no partial objectives, so the fourth model does not change them.</li>
+    <li><b>greedy4 and constructive PPO depend on the cost model.</b> They compute about 200 partial objectives per design. If each costs a full evaluation, 16,000 buys about 75 designs, and they fall to 0.753 and 0.757. If only overlap checks are charged, they cost 12–15× per evaluation and reach 0.779–0.781.</li>
+    <li><b>The rl_moo GA with our repair</b> drops from 0.750 to 0.734 when its overlap checks are charged. That is still above every IDETC method.</li>
+  </ul>
+  <p>Which cost model fits depends on what is expensive in the real problem. If the objectives come from simulation and overlap is a geometry check, charging partial objectives (model 4) is closest. If the constraint check is expensive too, model 3 is.</p>
 </section>
 
 <section id="geometry" class="col">
   <h2><span class="n">5</span>Evaluator fixes (<code>98087c3</code>)</h2>
+  <p>You mentioned that some of these were deliberate simplifications for the collision checks, and that fixing them is fine.</p>
   <ol>
     <li><b>Pointing rod and wire-port offsets.</b> The face center was \(c + \tfrac12\,\ell \odot p\) (elementwise), which mixes body-frame dimensions \(\ell\) with the world-frame direction \(p = R e_x\). It is now \(c + \tfrac{\ell_x}{2}\, p\). The same fix applies to the wire port.</li>
     <li><b>Inertia.</b> Each box's body-frame tensor is now rotated into the world frame, \(R\, I_{\text{body}}\, R^{\mathsf T}\), before the parallel-axis shift. Before, every box was treated as unrotated.</li>
@@ -277,7 +318,7 @@ footer { margin-top: 64px; border-top: 1px solid var(--rule); padding-top: 16px;
   <h3>Budget</h3>
   <figure>
     <img src="figs/hv_vs_evaluations.png" alt="Two line charts of hypervolume against evaluations with shaded standard deviation bands. Left: 500 to 16,000 evaluations for six methods. Right: 500 to 64,000 for structure mutation, reaching 0.813, and the plain GA, reaching 0.796.">
-    <figcaption><b>Figure 7.</b> HV against evaluations. Lines are means and bands are ±1 SD across seeds. Left: the r6 runs (seeds 4–9), with greedy4 and constructed sampling from the timing runs (seeds 0–1). Right: 64,000-evaluation runs, seeds 0–3.</figcaption>
+    <figcaption><b>Figure 8.</b> HV against evaluations. Lines are means and bands are ±1 SD across seeds. Left: the r6 runs (seeds 4–9), with greedy4 and constructed sampling from the timing runs (seeds 0–1). Right: 64,000-evaluation runs, seeds 0–3.</figcaption>
   </figure>
   <div class="tbl">
   <table>
@@ -295,24 +336,24 @@ footer { margin-top: 64px; border-top: 1px solid var(--rule); padding-top: 16px;
   <p>An evaluation takes about 4 ms, a constructed design about 0.4 s and a greedy4 design about 1.4 s, so methods that construct a lot are slower for the same evaluation count. Per minute, structure mutation is the best method. The plain GA run 4× longer (64,000 evaluations, about 20 minutes) scores 0.796, about what immigrants reach at 16,000 in the same time.</p>
   <figure>
     <img src="figs/hv_vs_time.png" alt="Hypervolume against minutes on a log scale for six methods, one line per seed. Structure mutation reaches about 0.79 in about 10 minutes; greedy4 and constructed sampling take 80 to 230 minutes.">
-    <figcaption><b>Figure 8.</b> HV against wall-clock minutes at checkpoints from 500 to 16,000 evaluations, one line per seed (2 seeds). The machine was shared with other jobs, so the times are rough.</figcaption>
+    <figcaption><b>Figure 9.</b> HV against wall-clock minutes at checkpoints from 500 to 16,000 evaluations, one line per seed (2 seeds). The machine was shared with other jobs, so the times are rough.</figcaption>
   </figure>
   <h3>Constructive PPO</h3>
   <figure>
     <img src="figs/constructive_ppo.png" alt="Line chart of HV with learning minus HV with learning off, by evaluations: +0.005 at 2,000, +0.008 at 4,000, +0.011 at 8,000 and +0.005 at 16,000, with a shaded standard deviation band and thin per-seed lines.">
-    <figcaption><b>Figure 9.</b> Constructive PPO, learning on minus learning off (the same policy fixed at greedy4's rule), for 4 seeds. The thick line is the mean, the band is ±1 SD, and the thin lines are individual seeds. Paired p: 0.31, 0.10, 0.05 and 0.11.</figcaption>
+    <figcaption><b>Figure 10.</b> Constructive PPO, learning on minus learning off (the same policy fixed at greedy4's rule), for 4 seeds. The thick line is the mean, the band is ±1 SD, and the thin lines are individual seeds. Paired p: 0.31, 0.10, 0.05 and 0.11.</figcaption>
   </figure>
   <p>The learned policy picks smaller structures (median front volume 0.47 m³ against 0.59 m³ with learning off). At 16,000 evaluations it scores 0.799, as high as any method on seeds 0–3. A run takes about 7 hours, against about 14 minutes for structure mutation, because 60–80% of builds hit a structure that cannot be filled. Starting from uniform choices instead of greedy4's rule learned nothing useful in 2,000 evaluations (0.750 against 0.758 with learning off). A learning rate of 3e-3 did worse than 1e-3 (+0.002 at 16,000).</p>
   <h3>Warm start</h3>
   <figure>
     <img src="figs/warm_start.png" alt="Two line charts of hypervolume against evaluations with standard deviation bands for constructed, learned-policy and learning-off starts. Policy starts lead by about 0.03 at 500 evaluations and the lead is gone by 16,000.">
-    <figcaption><b>Figure 10.</b> The GA started from 64 designs sampled from the trained policy (learned-policy), from the same policy with learning off, or from the constructor. 4 seeds; bands are ±1 SD. Policy starts lead by about 0.03 at 500 evaluations, and the lead is gone by 16,000. The learned and learning-off starts do not differ.</figcaption>
+    <figcaption><b>Figure 11.</b> The GA started from 64 designs sampled from the trained policy (learned-policy), from the same policy with learning off, or from the constructor. 4 seeds; bands are ±1 SD. Policy starts lead by about 0.03 at 500 evaluations, and the lead is gone by 16,000. The learned and learning-off starts do not differ.</figcaption>
   </figure>
   <p>The IDETC paper's GA started from random designs, which were mostly infeasible even on that code, so any decent start helped. Here the GA already starts from feasible constructed designs.</p>
   <h3>Transfer to new component lists</h3>
   <figure>
     <img src="figs/structure_transfer.png" alt="Bar charts with standard deviation error bars and seed dots of HV at 8,000 evaluations on two new component lists. Pools of structures raise GA plus immigrants from about 0.784 to 0.80 to 0.807, and constructed sampling from about 0.778 to 0.795.">
-    <figcaption><b>Figure 11.</b> Pools of structures reused on two randomly varied component lists, at 8,000 evaluations with 4 seeds. Bars are means with ±1 SD error bars, and dots are seeds.
+    <figcaption><b>Figure 12.</b> Pools of structures reused on two randomly varied component lists, at 8,000 evaluations with 4 seeds. Bars are means with ±1 SD error bars, and dots are seeds.
       <ul>
         <li>Front pool: the 34 structures on the default list's fronts.</li>
         <li>Matched pool: the same shell type, shelf count and volume, with random proportions.</li>
@@ -351,11 +392,10 @@ footer { margin-top: 64px; border-top: 1px solid var(--rule); padding-top: 16px;
   <ol>
     <li>Do you agree with the overlap analysis and the IDETC re-check? How would you like to handle the IDETC results?</li>
     <li>Is <code>ab59dbe</code>'s test the one you consider correct?</li>
-    <li>Do the six geometry fixes in section 5 match what you intended?</li>
     <li>Which thermal model would you like? Should component placement affect it?</li>
     <li>Which setting is the goal: one fixed problem, many component lists, or an expensive evaluator later?</li>
     <li>Is feasibility by construction acceptable, or should the policy learn the no-overlap constraint itself?</li>
-    <li>Should we run the four IDETC methods not yet run on the corrected evaluator (section 4)?</li>
+    <li>Which cost model in section 4 matches the real problem: is the expensive part the objectives, the constraint check, or both?</li>
     <li>How would you like the code: a branch, a pull request, or a summary first?</li>
   </ol>
 </section>

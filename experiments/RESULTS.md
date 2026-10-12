@@ -173,3 +173,43 @@ them and scores them on the IDETC reference. 8 seeds (0-7), mean ± 1 SD.
 Design repair PPO, warm-start GA and the intelligent-mutation GAs were not run on the corrected
 evaluator. Figures `methods_16k.png` and `old_vs_new.png`; the report for Alex is
 `report/index.html`.
+
+## IDETC methods chained on the corrected code (`idetc_c`, Oct 12)
+
+`run_idetc_methods.sh`: per seed, synthesis PPO and design repair PPO train (110a859's PPO settings,
+lr 1e-4), then the warm-start GA, intelligent-mutation GA and warm-start IM GA use their policies.
+4 seeds, 16,000 evaluations each.
+
+| Arm | HV | Feasible evaluations per run |
+|---|---|---|
+| `ppo` | no feasible design | 0 |
+| `repair` | no feasible design | 0 |
+| `wsga` | 0.326 ± 0.063 | 60-92 |
+| `imga` | 0.583 ± 0.090 | 9,103-9,982 |
+| `wsimga` | 0.411 ± 0.286 (seed 2: nothing feasible) | 0-8,319 |
+
+The repair policy is rewarded for lowering the overlap fraction, so IM GA mutations steer toward
+feasibility. Most of its feasible evaluations are repeats (1,366 feasible evaluations were 63
+distinct designs in one check), and it stores population rows by reference, so stored designs can
+differ from evaluated ones; objectives are unaffected.
+
+## Charging work outside evaluations (`r14_cost`, `r14_rate`, `r14_small`; `cost_models.py`)
+
+`utils/cost_counter.py` counts constructor and repair calls, overlap pair tests outside evaluations
+and partial-objective calls; runner records `costs` and `cost_trace`. One evaluation's constraint
+check is about 2,300 pair tests; a construction about 3.3 evaluations' worth (about 600 placement
+tries). Reruns of the fast arms reproduced the earlier HVs exactly. HV when the total cost reaches
+16,000 (seeds 0-3; cost per evaluation in brackets):
+
+| Arm | evaluations | +1 per construct/repair | overlap checks charged | partial objectives charged |
+|---|---|---|---|---|
+| `struct_0.2` | 0.800 | 0.790 (2.0) | 0.786 (2.6) | 0.800 (1.0) |
+| `immig_0.2` | 0.795 | 0.785 (2.2) | 0.778 (3.3) | 0.795 (1.0) |
+| `comp_construct_repair` | 0.784 | 0.776 (2.0) | 0.772 (2.4) | 0.784 (1.0) |
+| `greedy4` (estimated) | 0.793 | 0.790 (2.0) | 0.779 (12) | 0.753 (202) |
+| `cppo` (estimated) | 0.799 | 0.796 (2.8) | 0.781 (15) | 0.757 (221) |
+| `construct_only` | 0.772 | 0.769 (2.0) | 0.762 (4.6) | 0.772 (1.0) |
+| `lab_repair` | 0.750 | 0.742 (2.0) | 0.734 (3.1) | 0.750 (1.0) |
+
+IDETC methods do no construction or overlap repair and cost the same in every model. Figure
+`cost_models.png`; data `data/cost_models.json`.

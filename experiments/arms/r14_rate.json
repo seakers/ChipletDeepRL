@@ -1,0 +1,4 @@
+[
+ {"name": "greedy4", "method": "construct", "set": {"construct_greedy_m": 4}},
+ {"name": "cppo_g_lr1e-3", "method": "cppo", "set": {"cppo_prior": 3.0, "cppo_lr": 0.001}}
+]
