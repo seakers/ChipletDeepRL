@@ -4,6 +4,7 @@ Figures for the October results, from the run records in data/ (exact HV on the 
     python experiments/make_figures.py            # writes experiments/figures/*.png
 HV values are cached in figures/hv_cache.json; delete it after adding runs.
 """
+import glob
 import json
 import os
 import sys
@@ -102,8 +103,76 @@ def fig_feasibility():
     save(fig, 'feasibility_by_commit.png')
 
 
-def fig_methods():
-    rows = [
+FEAS_REF = np.load(os.path.join(ROOT, 'experiments', 'reference', 'feasible.npy'))
+
+
+def r1(tag, arm):
+    """Final HVs of round 1 records (tags cpu, gpu), which store fronts normalized by feasible.npy."""
+    out = {}
+    for path in sorted(glob.glob(os.path.join(ROOT, 'experiments', 'data', f'{tag}_shard_*.jsonl'))):
+        for line in open(path):
+            r = json.loads(line)
+            if r.get('arm') != arm or 'error' in r:
+                continue
+            key = f'{tag}|{arm}|{r["seed"]}|r1'
+            if key not in _cache:
+                f = np.asarray(r['front'], dtype=float).reshape(-1, 5) * FEAS_REF
+                _cache[key] = float(S.mc_hv(f, REF)) if len(f) else 0.0
+            out[r['seed']] = _cache[key]
+    return out
+
+
+def hv_rows(ax, rows, lo, hi, rng, labels=True):
+    """One row per method: seeds as dots, mean as a bar, mean +- 1 SD as a black line.
+    A row with vals None is a group header. labels=True writes mean +- SD right of the axis."""
+    n = len(rows)
+    for i, (name, vals, col) in enumerate(rows):
+        y = n - 1 - i
+        if vals is None:
+            continue
+        v = np.array(list(vals.values()), dtype=float)
+        if v.max() == 0:
+            if labels:
+                ax.text(lo + 0.01 * (hi - lo), y, f'no feasible design (n={len(v)})', va='center', fontsize=8.5, color=C['construct'])
+            continue
+        ax.barh(y, v.mean() - lo, left=lo, color=col, alpha=0.25, height=0.7)
+        ax.scatter(v, y + rng.uniform(-0.2, 0.2, len(v)), s=12, color=col, zorder=3, lw=0)
+        sd = v.std(ddof=1) if len(v) > 1 else 0.0
+        if len(v) > 1:
+            ax.plot([v.mean() - sd, v.mean() + sd], [y, y], color=INK, lw=1.4, zorder=4)
+            ax.plot([v.mean()] * 2, [y - 0.22, y + 0.22], color=INK, lw=1.4, zorder=4)
+        if labels:
+            txt = f'{v.mean():.3f} ± {sd:.3f}  (n={len(v)})'
+            if v.mean() < lo:
+                ax.text(lo + 0.01 * (hi - lo), y, f'<  {txt}', va='center', fontsize=8, color=INK)
+            else:
+                ax.text(hi + 0.01 * (hi - lo), y, txt, va='center', fontsize=8, color=INK)
+
+
+def row_axis(ax, rows):
+    n = len(rows)
+    ax.set_yticks([n - 1 - i for i, r in enumerate(rows) if r[1] is not None],
+                  [r[0] for r in rows if r[1] is not None])
+    ax.set_ylim(-0.6, n - 0.4)
+    ax.grid(axis='y', visible=False)
+
+
+def row_headers(ax, rows, x):
+    n = len(rows)
+    for i, (name, vals, col) in enumerate(rows):
+        if vals is None:
+            ax.text(x, n - 1 - i, name, va='center', ha='right', fontsize=9, color=INK, fontweight='bold',
+                    transform=ax.get_yaxis_transform())
+
+
+def method_rows():
+    old = [
+        ('random search', r1('cpu', 'random'), C['base']),
+        ('synthesis PPO', r1('gpu', 'ppo'), C['ppo']),
+        ('synthesis PPO + our repair', r1('gpu', 'ppo_repair'), C['ppo']),
+        ("Alex's GA", r1('cpu', 'lab'), C['base']),
+    ]
+    new = [
         ('GA + structure mutation', final([('r3', 'struct_0.2'), ('r6_seeds', 'struct_0.2')]), C['struct']),
         ('GA + immigrants', final([('r2', 'immig_0.2'), ('r6_seeds', 'immig_0.2')]), C['immig']),
         ('GA + free oracle (best of 8 moves)', final([('r4_oracle', 'oracle_free_mc'), ('r6_seeds', 'oracle_free_mc')]), C['oracle']),
@@ -111,31 +180,61 @@ def fig_methods():
         ('constructive PPO', final([('r12_cppo', 'cppo_g_lr1e-3')]), C['ppo']),
         ('GA, constructed start + repair', final([('r2', 'comp_construct_repair'), ('r6_seeds', 'comp_construct_repair')]), C['base']),
         ('constructed sampling', final([('r2', 'construct_only')]), C['construct']),
-        ('synthesis PPO + repair (IDETC settings)', final([('gpu_idetc', 'ppo_repair_idetc')]), C['ppo']),
-        ('synthesis PPO (IDETC settings)', {0: 0.0}, C['ppo']),
     ]
-    fig, ax = plt.subplots(figsize=(7.2, 4.2))
-    rng = np.random.default_rng(1)
-    for i, (name, vals, col) in enumerate(rows):
-        v = np.array(list(vals.values()), dtype=float)
-        y = len(rows) - 1 - i
-        lo = 0.55
-        if v.mean() > lo:
-            ax.barh(y, v.mean() - lo, left=lo, color=col, alpha=0.25, height=0.7)
-            ax.scatter(v, y + rng.uniform(-0.18, 0.18, len(v)), s=14, color=col, zorder=3)
-            ax.text(max(v.max(), v.mean()) + 0.004, y, f'{v.mean():.3f}  ({len(v)} seed{"s" if len(v) > 1 else ""})', va='center', fontsize=8.5, color=INK)
-        else:
-            lab = f'{v.mean():.3f}, off the scale (1 seed)' if v.mean() > 0 else 'no feasible design (1 seed)'
-            ax.text(lo + 0.004, y, '<  ' + lab, va='center', fontsize=8.5, color=INK)
-    ax.set_yticks(range(len(rows)), [r[0] for r in rows][::-1])
-    ax.set_xlim(0.55, 0.86)
-    ax.set_xlabel('hypervolume at 16,000 evaluations (IDETC reference)')
-    ax.set_ylim(-0.6, len(rows) - 0.4)
-    ax.text(0.55, -1.75, '4-seed arms use seeds 0-3, where the plain GA averages 0.784 (0.778 over 10 seeds).',
-            fontsize=8.5, color=MUTED)
-    ax.set_title('Equal evaluations (16,000): structure diversity is what helps', loc='left', fontsize=11, color=INK)
-    ax.grid(axis='y', visible=False)
+    return old, new
+
+
+def fig_methods():
+    old, new = method_rows()
+    rows = [('Ours', None, None)] + new + [('From the IDETC paper', None, None)] + old
+    fig, axes = plt.subplots(1, 2, figsize=(10.4, 5.2), sharey=True, gridspec_kw={'width_ratios': [1, 1.15]})
+    for ax, (lo, hi), labels in [(axes[0], (0, 0.85), False), (axes[1], (0.72, 0.82), True)]:
+        ax.set_xlim(lo, hi)
+        hv_rows(ax, rows, lo, hi, np.random.default_rng(1), labels=labels)
+        row_axis(ax, rows)
+    row_headers(axes[0], rows, -0.02)
+    axes[0].set_title('full scale', loc='left', fontsize=10, color=MUTED)
+    axes[1].set_title('zoomed', loc='left', fontsize=10, color=MUTED)
+    fig.supxlabel('hypervolume at 16,000 evaluations (IDETC reference); dots = seeds, black = mean ± 1 SD', fontsize=9.5, color=INK)
+    fig.text(0.01, -0.04, 'All on the corrected code. Ours: 10 seeds (0-9) or 4 (0-3; the plain GA averages 0.784 on those). '
+             'IDETC-paper methods: round 1 runs (seeds 0-7; PPO 1 or 3 seeds).', fontsize=8.5, color=MUTED)
+    fig.suptitle('Equal evaluations (16,000): methods from the IDETC paper against ours', x=0.01, y=1.0, ha='left', fontsize=11, color=INK)
     save(fig, 'methods_16k.png')
+
+
+def fig_old_vs_new():
+    # round 1: every arm 8 seeds (0-7), same commit, same day, so a like-for-like ladder
+    rows = [
+        ("Alex's GA (each gene mutated w.p. 0.1)", None, None),
+        ("Alex's GA", r1('cpu', 'lab'), C['base']),
+        ('+ constructed start', r1('cpu', 'lab_construct'), C['base']),
+        ('+ overlap repair', r1('cpu', 'lab_repair'), C['base']),
+        ('+ both', r1('cpu', 'lab_construct_repair'), C['base']),
+        ('Our GA (redraw one whole component)', None, None),
+        ('component mutation', r1('cpu', 'comp'), C['immig']),
+        ('+ constructed start', r1('cpu', 'comp_construct'), C['immig']),
+        ('+ overlap repair', r1('cpu', 'comp_repair'), C['immig']),
+        ('+ both', r1('cpu', 'comp_construct_repair'), C['immig']),
+        ('+ both + immigrants', r1('cpu', 'immig_0.2'), C['immig']),
+        ('+ both + structure mutation', r1('cpu', 'struct_0.2'), C['struct']),
+        ('No GA', None, None),
+        ('random search', r1('cpu', 'random'), C['construct']),
+        ('constructed sampling', r1('cpu', 'construct_only'), C['construct']),
+    ]
+    fig, ax = plt.subplots(figsize=(7.6, 5.4))
+    ax.set_xlim(0, 0.85)
+    hv_rows(ax, rows, 0, 0.85, np.random.default_rng(2), labels=True)
+    row_axis(ax, rows)
+    row_headers(ax, rows, -0.02)
+    ax.set_xlabel('hypervolume at 16,000 evaluations (IDETC reference)\ndots = 8 seeds, black = mean ± 1 SD')
+    ax.set_title("What each piece adds, starting from Alex's GA (round 1, corrected code)", loc='left', fontsize=11, color=INK)
+    save(fig, 'old_vs_new.png')
+
+
+def band(ax, x, a, col, label):
+    m, sd = np.nanmean(a, 0), np.nanstd(a, 0, ddof=1)
+    ax.fill_between(x, m - sd, m + sd, color=col, alpha=0.13, lw=0)
+    ax.plot(x, m, '-o', ms=3.5, color=col, label=label)
 
 
 def fig_curves():
@@ -152,19 +251,19 @@ def fig_curves():
     ax = axes[0]
     for name, tag, arm, col in series:
         a = curve(tag, arm, cps)
-        ax.plot(cps, np.nanmean(a, 0), '-o', ms=3.5, color=col, label=f'{name} ({len(a)} seeds)')
+        band(ax, cps, a, col, f'{name} ({len(a)} seeds)')
     ax.set_xscale('log'); ax.minorticks_off()
     ax.set_xticks(cps, ['500', '1k', '2k', '4k', '8k', '16k'])
     ax.set_xlabel('evaluations')
-    ax.set_ylabel('hypervolume')
+    ax.set_ylabel('hypervolume (band = ± 1 SD across seeds)')
     ax.set_ylim(0.6, 0.83)
-    ax.set_title('16,000-evaluation runs', loc='left', fontsize=10.5, color=INK)
+    ax.set_title('16,000-evaluation runs (seeds 4-9; greedy4 and sampling 0-1)', loc='left', fontsize=10.5, color=INK)
     ax.legend(fontsize=8, loc='lower right')
     ax = axes[1]
     lcps = [500, 1000, 2000, 4000, 8000, 16000, 32000, 64000]
     for name, arm, col in [('GA + structure mutation', 'struct_0.2', C['struct']), ('GA, constructed start + repair', 'comp_construct_repair', C['base'])]:
         a = curve('r10_long', arm, lcps)
-        ax.plot(lcps, np.nanmean(a, 0), '-o', ms=3.5, color=col, label=f'{name} (4 seeds)')
+        band(ax, lcps, a, col, f'{name} (4 seeds)')
     ax.set_xscale('log'); ax.minorticks_off()
     ax.set_xticks([500, 2000, 8000, 32000, 64000], ['500', '2k', '8k', '32k', '64k'])
     ax.set_xlabel('evaluations')
@@ -201,7 +300,9 @@ def fig_cppo():
     fig, ax = plt.subplots(figsize=(6.2, 3.6))
     for k in range(len(on)):
         ax.plot(cps, on[k] - off[k], '-', color=C['ppo'], alpha=0.35, lw=1)
-    ax.plot(cps, np.mean(on - off, 0), '-o', color=C['ppo'], lw=2.4, label='mean of 4 seeds')
+    d = on - off
+    ax.fill_between(cps, d.mean(0) - d.std(0, ddof=1), d.mean(0) + d.std(0, ddof=1), color=C['ppo'], alpha=0.15, lw=0, label='mean ± 1 SD')
+    ax.plot(cps, d.mean(0), '-o', color=C['ppo'], lw=2.4, label='mean of 4 seeds (thin lines: each seed)')
     ax.axhline(0, color=MUTED, lw=1)
     for n, d, w in zip(cps, np.mean(on - off, 0), (on - off > 0).sum(0)):
         ax.text(n, d + 0.0015, f'{d:+.3f}\n{w}/4 seeds', ha='center', fontsize=8.5, color=INK)
@@ -224,12 +325,12 @@ def fig_warmstart():
             ('GA + structure mutation', [('constructed start', 'struct_0.2', C['struct']), ('learned-policy start', 'ws_cppo_struct_0.2', C['ppo']), ('learning-off start', 'ws_frozen_struct_0.2', C['greedy'])])]):
         for name, arm, col in arms:
             a = curve('r13_warmstart', arm, cps)
-            ax.plot(cps, np.nanmean(a, 0), '-o', ms=3.5, color=col, label=name)
+            band(ax, cps, a, col, name)
         ax.set_xscale('log'); ax.minorticks_off()
         ax.set_xticks(cps, ['500', '1k', '2k', '4k', '8k', '16k'])
         ax.set_title(title, loc='left', fontsize=10.5, color=INK)
         ax.set_xlabel('evaluations')
-    axes[0].set_ylabel('hypervolume (4 seeds)')
+    axes[0].set_ylabel('hypervolume (4 seeds, band = ± 1 SD)')
     for ax in axes:
         ax.legend(fontsize=8.5, loc='lower right')
     fig.suptitle('Warm start from the constructive PPO policy: ahead early, level by 16,000', x=0.01, y=1.03, ha='left', fontsize=11, color=INK)
@@ -250,13 +351,16 @@ def fig_transfer():
             for k, (lab, tag, arm) in enumerate(items):
                 v = np.array(list(final([(tag, f'{m}_{arm}')]).values()), dtype=float)
                 x = mi * (len(items) + 1) + k
-                ax.bar(x, v.mean(), color=cols[lab], label=lab if mi == 0 else None)
-                ax.text(x, v.mean() + 0.002, f'{v.mean():.3f}', ha='center', fontsize=8, color=INK)
+                sd = v.std(ddof=1)
+                ax.bar(x, v.mean(), color=cols[lab], alpha=0.85, label=lab if mi == 0 else None)
+                ax.errorbar(x, v.mean(), yerr=sd, color=INK, lw=1.2, capsize=3)
+                ax.scatter(x + np.linspace(-0.2, 0.2, len(v)), v, s=8, color=INK, alpha=0.5, zorder=3, lw=0)
+                ax.text(x, max(v.mean() + sd, v.max()) + 0.0015, f'{v.mean():.3f}', ha='center', fontsize=8, color=INK)
         ax.set_xticks([(len(items) - 1) / 2, len(items) + 1 + (len(items) - 1) / 2], ['component list 1', 'component list 2'])
         ax.set_title(title, loc='left', fontsize=10.5, color=INK)
-        ax.set_ylim(0.75, 0.815)
+        ax.set_ylim(0.75, 0.825)
         ax.grid(axis='x', visible=False)
-    axes[0].set_ylabel('HV at 8,000 evaluations (4 seeds)')
+    axes[0].set_ylabel('HV at 8,000 evaluations\n(4 seeds, bars = mean ± 1 SD)')
     axes[0].legend(fontsize=8, loc='upper center', bbox_to_anchor=(0.5, -0.13), ncol=2)
     axes[1].legend(fontsize=8, loc='upper center', bbox_to_anchor=(0.5, -0.13), ncol=3)
     fig.suptitle('Reusing structures on new component lists: size and type carry the gain', x=0.01, y=1.03, ha='left', fontsize=11, color=INK)
@@ -298,7 +402,7 @@ def fig_idetc():
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)
     try:
-        for f in [fig_feasibility, fig_methods, fig_curves, fig_time, fig_cppo, fig_warmstart, fig_transfer, fig_idetc]:
+        for f in [fig_feasibility, fig_methods, fig_old_vs_new, fig_curves, fig_time, fig_cppo, fig_warmstart, fig_transfer, fig_idetc]:
             f()
     finally:
         json.dump(_cache, open(CACHE_PATH, 'w'))

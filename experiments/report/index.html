@@ -1,0 +1,375 @@
+<title>Spacecraft Layout Report</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,500;7..72,650&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<script>
+window.MathJax = {
+  tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] },
+  svg: { fontCache: 'global' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-svg.js"></script>
+<style>
+/* Layout: one reading column of numbered report sections; figures and tables may run wider than the text. */
+:root {
+  --bg: #f7f8f9;
+  --paper: #ffffff;
+  --ink: #18202c;
+  --muted: #5a6475;
+  --rule: #d6dbe3;
+  --accent: #1d5c8c;
+  --accent-soft: #e6eef5;
+  --bad: #b8402a;
+  --good: #1d7a4b;
+  --display: 'Literata', Georgia, 'Times New Roman', serif;
+  --body: 'Source Sans 3', 'Segoe UI', system-ui, sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12161c; --paper: #1a2029; --ink: #e4e8ee; --muted: #9aa4b4; --rule: #2e3643;
+    --accent: #7fb2dc; --accent-soft: #1f2d3b; --bad: #e0806b; --good: #6cc499; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12161c; --paper: #1a2029; --ink: #e4e8ee; --muted: #9aa4b4; --rule: #2e3643;
+  --accent: #7fb2dc; --accent-soft: #1f2d3b; --bad: #e0806b; --good: #6cc499; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.6; padding-inline: 16px; padding-block: 0; }
+main { max-width: 980px; margin: 0 auto; padding-block: 40px 80px; }
+.col { max-width: 700px; }
+header { border-bottom: 1px solid var(--rule); padding-block: 8px 24px; margin-bottom: 8px; }
+.kicker { font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+h1 { font-family: var(--display); font-weight: 650; font-size: clamp(28px, 4.2vw, 40px); line-height: 1.15; margin: 10px 0 14px; text-wrap: balance; }
+.byline { color: var(--muted); font-size: 15px; }
+h2 { font-family: var(--display); font-weight: 650; font-size: 25px; line-height: 1.25; margin: 56px 0 10px; text-wrap: balance; display: flex; gap: 12px; align-items: baseline; }
+h2 .n { font-family: var(--mono); font-size: 15px; color: var(--accent); font-weight: 600; }
+h3 { font-family: var(--display); font-weight: 500; font-size: 19px; margin: 32px 0 6px; text-wrap: balance; }
+p, ul, ol { margin: 0 0 14px; }
+li { margin-bottom: 6px; }
+code, .mono { font-family: var(--mono); font-size: 0.86em; }
+code { background: var(--accent-soft); padding: 1px 5px; border-radius: 3px; overflow-wrap: anywhere; }
+a { color: var(--accent); }
+.summary { background: var(--paper); border: 1px solid var(--rule); border-radius: 6px; padding: 20px 24px 8px; margin-top: 28px; }
+.summary h2 { margin-top: 0; }
+.toc { font-size: 15px; columns: 2 220px; margin: 22px 0 0; padding-left: 20px; color: var(--muted); }
+.toc li { margin-bottom: 2px; break-inside: avoid; }
+figure { margin: 22px 0 26px; }
+figure img { display: block; width: 100%; height: auto; background: #fff; border: 1px solid var(--rule); border-radius: 4px; padding: 8px; }
+figcaption { font-size: 14.5px; color: var(--muted); margin-top: 8px; max-width: 760px; }
+figcaption b { color: var(--ink); font-weight: 600; }
+.tbl { overflow-x: auto; margin: 16px 0 22px; }
+table { border-collapse: collapse; font-size: 15px; min-width: 520px; width: 100%; }
+th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-weight: 600; color: var(--muted); font-size: 13px; letter-spacing: 0.02em; border-bottom: 1.5px solid var(--muted); }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+tr.grp td { font-weight: 600; color: var(--accent); padding-top: 14px; border-bottom: none; font-size: 13.5px; }
+.zero { color: var(--bad); font-weight: 600; }
+.note { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 10px 16px; margin: 18px 0; font-size: 15.5px; }
+.mjx-wrap { overflow-x: auto; }
+mjx-container[display="true"] { overflow-x: auto; overflow-y: hidden; padding: 0.2rem 0; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.two > * { min-width: 0; }
+@media (max-width: 720px) { .two { grid-template-columns: 1fr; } body { font-size: 16px; } }
+footer { margin-top: 64px; border-top: 1px solid var(--rule); padding-top: 16px; color: var(--muted); font-size: 14px; }
+</style>
+
+<main>
+<header class="col">
+  <div class="kicker">Technical report · rl_moo spacecraft configuration</div>
+  <h1>The overlap check, the IDETC results re-checked, and methods on the corrected evaluator</h1>
+  <div class="byline">Oliver Fan · October 12, 2026 · prepared for Alex Demagall</div>
+</header>
+
+<section class="summary col">
+  <h2>Summary</h2>
+  <ul>
+    <li>Before <code>ab59dbe</code> (Aug 6), the separating-axis test reported two boxes as clear whenever they had a pair of parallel edges. Every component has an axis along its panel's normal, so pairs on the same or parallel panels were never really tested. <code>110a859</code>, which produced the IDETC results, has this test.</li>
+    <li>We reran <code>110a859</code>'s own seven methods with its own settings (2 seeds). Its test called 67,520 designs feasible. Of the 16,432 we re-checked with the corrected test, <b>none</b> pass. The GA-type designs typically have 2–4 overlapping component pairs, 7–10 cm deep. The PPO-based designs pile components together: 167–402 of 820 pairs overlap.</li>
+    <li>On the corrected evaluator, 0 of 16,000 random designs are feasible. Random search and synthesis PPO find no feasible design, and the rl_moo GA reaches HV 0.356 ± 0.036 at 16,000 evaluations.</li>
+    <li>Three additions make the search work: a start from designs that are feasible by construction, a step that repairs overlaps, and a mutation that keeps structures diverse. With all three, the GA reaches 0.793 ± 0.009 at 16,000 evaluations (10 seeds) and 0.813 at 64,000.</li>
+    <li>Constructive PPO, which builds each design from feasible choices, is the only RL variant that helped. It gains +0.011 over its own non-learned starting rule at 8,000 evaluations (4 of 4 seeds, p = 0.05). It ties the best GA per evaluation but is about 30× slower per minute.</li>
+    <li>Separately, we fixed six geometry errors in the evaluator and seven in the PPO code (sections 5 and 6). All numbers in this report use the corrected code.</li>
+  </ul>
+  <ol class="toc">
+    <li><a href="#setup">Setup and measurement</a></li>
+    <li><a href="#overlap">The overlap check</a></li>
+    <li><a href="#idetc">The IDETC commit, rerun</a></li>
+    <li><a href="#compare">IDETC-paper methods against ours</a></li>
+    <li><a href="#geometry">Evaluator fixes</a></li>
+    <li><a href="#ppo">PPO fixes</a></li>
+    <li><a href="#methods">Methods we added</a></li>
+    <li><a href="#results">Further results</a></li>
+    <li><a href="#next">Conclusions and proposals</a></li>
+    <li><a href="#questions">Questions</a></li>
+    <li><a href="#repro">Reproducing</a></li>
+  </ol>
+</section>
+
+<section id="setup" class="col">
+  <h2><span class="n">1</span>Setup and measurement</h2>
+  <p><b>Problem.</b> The IDETC configuration has 41 components and 210 variables: 5 structure genes (shell shape, x/y/z size, shelf count) and 5 per component (panel, x and y position on 101 steps, face down on 6 choices, rotation on 36 steps). There are five minimized objectives: center-of-mass offset, off-axis inertia, on-axis inertia, wire length and thermal. The constraint is no overlap between components, panels and pointing keep-out rods.</p>
+  <p><b>Code.</b> rl_moo with the Aug 6 overlap test (<code>ab59dbe</code>) and our evaluator fixes (<code>98087c3</code>, section 5). The thermal model is unchanged: it depends only on the shell's outside area and the fixed total heat.</p>
+  <p><b>Hypervolume.</b> We compute HV from each run's raw final front by Monte Carlo, using 200,000 fixed uniform points in the normalized objective box (standard error about 0.001). Objectives are divided by the reference point, and points beyond it are dropped. The reference is 1.5× the per-objective maximum over 16,000 random designs, following the rule in the IDETC paper (the code at <code>110a859</code> uses 2.0×). We did not use <code>HypervolumeGrid</code>. With 21 cells per axis, its step is 0.05, and on this reference the fronts occupy very few cells. For example, front thermal values from 0.070 to 0.083 all fall in one cell, so the grid HV stops changing while the exact HV is still rising.</p>
+  <p><b>Runs.</b> Unless noted: 16,000 evaluations, population 64, 8 elites. "±" is one standard deviation across seeds, and <i>n</i> is the number of seeds. p-values are paired t-tests over matched seeds.</p>
+</section>
+
+<section id="overlap" class="col">
+  <h2><span class="n">2</span>The overlap check</h2>
+  <p>Two boxes (centers \(c_A, c_B\), half-lengths \(a_i, b_j\), unit axes \(A_i, B_j\)) are disjoint exactly when some axis \(L\) separates their projections:</p>
+  <div class="mjx-wrap">\[ |T \cdot L| \;>\; r_A + r_B, \qquad T = c_B - c_A,\quad r_A = \sum_i a_i\,|A_i \cdot L|,\quad r_B = \sum_j b_j\,|B_j \cdot L|. \]</div>
+  <p>The test tries 15 axes: the 3 face normals of each box and the 9 cross products \(A_i \times B_j\). An axis can only prove the boxes are apart. If no axis does, they overlap. When \(A_i \parallel B_j\), the cross product is zero, both sides are 0, and the axis must not count as separating. The standard fix (Ericsson) pads every \(|R_{ij}| = |A_i \cdot B_j|\) by \(\varepsilon\), which makes the right side slightly positive on a zero axis.</p>
+  <p><b>What the code did before Aug 6.</b> It used \(\varepsilon = 10^{-6}\) and also subtracted a contact tolerance on the cross axes:</p>
+  <div class="mjx-wrap">\[ |T \cdot L| \;>\; r_A + r_B - 2\times10^{-6}. \]</div>
+  <p>On a zero axis, the left side is 0 and the right side is \(10^{-6} S - 2\times10^{-6}\), where \(S\) is the sum of the four half-lengths that enter. That is negative whenever \(S &lt; 2\) m, which holds for every component pair here. So the axis "separates", and the pair is reported clear.</p>
+  <p><b>Why this cleared almost everything.</b> A component's orientation is one of 6 faces down plus a rotation about the panel normal, so each component has an edge exactly along its panel's normal. That gives a parallel edge pair, and a false "clear", for:</p>
+  <ul>
+    <li>every component and the panel it sits on;</li>
+    <li>any two components on the same panel;</li>
+    <li>any two components on parallel panels.</li>
+  </ul>
+  <p>Two identical boxes in the same place also come out clear. We confirmed this by loading the old function from <code>c147c02</code>, <code>05eb825</code> and the pre-Aug-6 code (<code>experiments/probes/old_overlap_test.py</code>).</p>
+  <p><b>The two later changes.</b></p>
+  <ul>
+    <li><code>c22d2a6</code> (Jun 26) cut the tolerance to \(10^{-9}\) but kept the \(10^{-6}\) padding. A component resting on a panel then counts as overlapping it, so nothing was feasible from Jun 26 to Aug 6.</li>
+    <li><code>ab59dbe</code> (Aug 6) set the padding to \(10^{-9}\) and changed the cross-axis tests to \(|T\cdot L| &gt; r_A + r_B + \varepsilon\). Face axes keep a small tolerance, so touching still counts as clear. We checked this version against an independent exact overlap computation and use it unchanged.</li>
+  </ul>
+  <figure>
+    <img src="figs/feasibility_by_commit.png" alt="Bar chart of feasible random designs out of 2,000 for six commits. With the 18-component list: 95, 70 and 94 before June 26, then 0. With the 41-component list: 1 and 4, then 0.">
+    <figcaption><b>Figure 1.</b> Random designs (out of 2,000) that pass each commit's own feasibility check, using each commit's own random search. None of the 194 (Aug 2025 code) and 188 (Mar 2026 code) random designs the old test accepted with the 18-component list pass the corrected test, even allowing 1 mm of contact. A typical one has 1 component pair and 4 component-panel pairs overlapping by more than 1 cm.</figcaption>
+  </figure>
+</section>
+
+<section id="idetc" class="col">
+  <h2><span class="n">3</span>The IDETC commit, rerun</h2>
+  <p>We ran <code>110a859</code> in its own worktree with its own <code>opt_main</code> methods and settings: lr 1e-4, clip 0.2, λ 0.95, mini-batch 64, 5 update iterations, target KL 0.003, 500 epochs (32,000 evaluations), GA population 64. We used 2 seeds. Each method trains its policies earlier in the same run, as in that code.</p>
+  <ul>
+    <li>We kept every design the commit's own test called feasible. We then re-checked it with the <code>ab59dbe</code> test, with all other geometry left as in <code>110a859</code>. Where a method had more than 2,000 such designs, we checked a random 2,000.</li>
+    <li>The only change was running PPO in fp32 on the CPU, because that commit's fp16 Dirichlet sampling has no CPU kernel.</li>
+    <li>Design repair stops by evaluation count, and every edit counts as an evaluation, so it ran 57,236 and 66,951 evaluations.</li>
+  </ul>
+  <div class="tbl">
+  <table>
+    <thead><tr><th>Method (110a859)</th><th class="num">Called feasible by its test (seed 0 / 1)</th><th class="num">Re-checked</th><th class="num">Pass the corrected test</th><th class="num">Overlapping component pairs, median</th><th class="num">Deepest overlap, median</th></tr></thead>
+    <tbody>
+      <tr><td>Random search</td><td class="num">29 / 32</td><td class="num">61</td><td class="num zero">0</td><td class="num">3</td><td class="num">8–9 cm</td></tr>
+      <tr><td>GA</td><td class="num">3,733 / 4,138</td><td class="num">4,000</td><td class="num zero">0</td><td class="num">3</td><td class="num">8 cm</td></tr>
+      <tr><td>Warm-start GA</td><td class="num">4,159 / 3,822</td><td class="num">4,000</td><td class="num zero">0</td><td class="num">2–3</td><td class="num">7–8 cm</td></tr>
+      <tr><td>Design repair PPO</td><td class="num">116 / 114</td><td class="num">230</td><td class="num zero">0</td><td class="num">3</td><td class="num">9 cm</td></tr>
+      <tr><td>Intelligent-mutation GA</td><td class="num">0 / 10,285</td><td class="num">2,000</td><td class="num zero">0</td><td class="num">4</td><td class="num">10 cm</td></tr>
+      <tr><td>Synthesis PPO (informed state)</td><td class="num">3,306 / 141</td><td class="num">2,141</td><td class="num zero">0</td><td class="num">167–230</td><td class="num">18–21 cm</td></tr>
+      <tr><td>Warm-start intelligent-mutation GA</td><td class="num">21,528 / 16,117</td><td class="num">4,000</td><td class="num zero">0</td><td class="num">381–402</td><td class="num">21–26 cm</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>The PPO-based methods learned to stack components inside each other. That shortens wires and pulls the center of mass in, and the old test never objected. About 200 (synthesis PPO) and 400 (warm-start intelligent-mutation GA) of the 820 component pairs overlap.</p>
+  <figure>
+    <img src="figs/idetc_recheck.png" alt="Left: designs each 110a859 method called feasible, by method. Right: median overlapping component pairs per design, one dot per seed, from about 2 to 400 on a log scale. Every method is marked 0 pass.">
+    <figcaption><b>Figure 2.</b> 110a859's methods. Left: designs its test called feasible (seed 0 + seed 1). Right: median overlapping component pairs per design under the corrected test, one dot per seed. No design from any method passes.</figcaption>
+  </figure>
+  <figure>
+    <img src="figs/idetc_ga_design.png" alt="Three 3D views of a GA design from 110a859: the whole spacecraft with overlapping components in red, and a close-up of a battery and magnetometer overlapping by 8 cm.">
+    <figcaption><b>Figure 3.</b> A design 110a859's GA called feasible (seed 0, the median overlap depth). The corrected test finds 1 component pair, 2 component-panel pairs and 16 keep-out-rod overlaps. The deepest is a battery inside a magnetometer by 8 cm.</figcaption>
+  </figure>
+  <figure>
+    <img src="figs/idetc_ppo_design.png" alt="Three 3D views of a synthesis PPO design from 110a859: components piled into one corner, and a close-up of two payload boxes overlapping by 19 cm.">
+    <figcaption><b>Figure 4.</b> A design 110a859's synthesis PPO called feasible (seed 0, the median number of overlaps). It has 230 overlapping component pairs, with components piled in one corner. The deepest is two payloads overlapping by 19 cm.</figcaption>
+  </figure>
+</section>
+
+<section id="compare" class="col">
+  <h2><span class="n">4</span>IDETC-paper methods against ours, on the corrected evaluator</h2>
+  <p>Round 1 of our experiments (Oct 5, 8 seeds, one commit) ran the rl_moo GA, random search and NSGA-III next to our methods, all on the corrected evaluator. The rl_moo GA is pygad with NSGA-II selection, 16 parents mating, and random mutation with per-gene probability 0.1. Its settings match <code>110a859</code>'s, plus the constraint-violation term in the fitness that <code>05eb825</code> added. Synthesis PPO ran on the same code with our PPO fixes, on 1 seed alone and on 3 seeds with our overlap repair applied to each sample.</p>
+  <figure>
+    <img src="figs/methods_16k.png" alt="Horizontal bars of hypervolume at 16,000 evaluations with seed dots and standard deviation lines, on a full scale and a zoomed scale. Our methods score 0.772 to 0.799; synthesis PPO with repair 0.613; the rl_moo GA 0.356; random search and synthesis PPO find no feasible design.">
+    <figcaption><b>Figure 5.</b> HV at 16,000 evaluations. Dots are seeds, and the black line is the mean ± 1 SD. The left panel is full scale; the right panel zooms in on our methods. Our 10-seed methods use seeds 0–9, and our 4-seed methods use seeds 0–3 (the plain GA averages 0.784 on those). The IDETC-paper methods are round 1 runs.</figcaption>
+  </figure>
+  <p>Figure 6 adds one piece at a time to the rl_moo GA, all within round 1, so every row is directly comparable.</p>
+  <figure>
+    <img src="figs/old_vs_new.png" alt="Ladder of hypervolume from the rl_moo GA at 0.356, with constructed start 0.706, with repair 0.751; our component-mutation GA from 0.478 up to 0.779 with both, 0.793 with immigrants and 0.788 with structure mutation; random search finds nothing; constructed sampling 0.770.">
+    <figcaption><b>Figure 6.</b> What each piece adds (round 1, 8 seeds each, mean ± 1 SD). "Constructed start": the initial population is built feasible (section 7). "Overlap repair": overlapping components are re-placed before each evaluation. "Component mutation": redraw all 5 genes of one component instead of mutating each gene with probability 0.1.</figcaption>
+  </figure>
+  <ul>
+    <li><b>The feasible start is the biggest single step.</b> It takes the rl_moo GA from 0.356 to 0.706. Repair alone reaches 0.751, and both together give 0.750.</li>
+    <li><b>Our mutation helps only together with start and repair.</b> Alone it scores 0.478 ± 0.068, since a whole-component redraw usually creates an overlap. With start and repair it reaches 0.779, against 0.750 for the rl_moo mutation with the same two pieces.</li>
+    <li><b>Structure diversity adds the rest:</b> 0.788 with structure mutation and 0.793 with immigrants in this round.</li>
+  </ul>
+  <div class="tbl">
+  <table>
+    <thead><tr><th>Method, 16,000 evaluations</th><th class="num">HV</th><th class="num">n</th></tr></thead>
+    <tbody>
+      <tr class="grp"><td colspan="3">From the IDETC paper (corrected evaluator)</td></tr>
+      <tr><td>Random search</td><td class="num zero">no feasible design</td><td class="num">8</td></tr>
+      <tr><td>Synthesis PPO, our settings / IDETC settings</td><td class="num zero">no feasible design</td><td class="num">1 / 1</td></tr>
+      <tr><td>Synthesis PPO + our repair</td><td class="num">0.613 ± 0.050</td><td class="num">3</td></tr>
+      <tr><td>Synthesis PPO + our repair, IDETC settings (lr 3e-4, clip 0.05, λ 0.9, mini-batch 16)</td><td class="num">0.601</td><td class="num">1</td></tr>
+      <tr><td>rl_moo GA</td><td class="num">0.356 ± 0.036</td><td class="num">8</td></tr>
+      <tr class="grp"><td colspan="3">Other baseline</td></tr>
+      <tr><td>NSGA-III (pymoo, SBX + polynomial mutation)</td><td class="num">0.401 ± 0.044</td><td class="num">8</td></tr>
+      <tr class="grp"><td colspan="3">Ours</td></tr>
+      <tr><td>GA, constructed start + repair</td><td class="num">0.778 ± 0.012</td><td class="num">10</td></tr>
+      <tr><td>+ 20% structure mutation</td><td class="num">0.793 ± 0.009</td><td class="num">10</td></tr>
+      <tr><td>+ 20% immigrants</td><td class="num">0.794 ± 0.010</td><td class="num">10</td></tr>
+      <tr><td>+ best of 8 component moves (oracle, lookahead not counted)</td><td class="num">0.792 ± 0.013</td><td class="num">10</td></tr>
+      <tr><td>Greedy constructor (greedy4), no GA</td><td class="num">0.793 ± 0.003</td><td class="num">4</td></tr>
+      <tr><td>Constructive PPO</td><td class="num">0.799 ± 0.005</td><td class="num">4</td></tr>
+      <tr><td>Constructed sampling, no GA</td><td class="num">0.772 ± 0.003</td><td class="num">4</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>Structure mutation, immigrants and the oracle each beat the plain GA on 8–9 of 10 seeds (paired p 0.003–0.013), and they cannot be told apart from each other (p &gt; 0.7).</p>
+  <div class="note">We have not run design repair PPO, warm-start GA, the intelligent-mutation GA or the warm-start intelligent-mutation GA on the corrected evaluator. All four start from policies trained by synthesis or repair PPO. On the corrected test those policies never see a feasible design, so the warm-start GAs would start from infeasible designs, much like the rl_moo GA from random ones. We can run them if you want the full set.</div>
+</section>
+
+<section id="geometry" class="col">
+  <h2><span class="n">5</span>Evaluator fixes (<code>98087c3</code>)</h2>
+  <ol>
+    <li><b>Pointing rod and wire-port offsets.</b> The face center was \(c + \tfrac12\,\ell \odot p\) (elementwise), which mixes body-frame dimensions \(\ell\) with the world-frame direction \(p = R e_x\). It is now \(c + \tfrac{\ell_x}{2}\, p\). The same fix applies to the wire port.</li>
+    <li><b>Inertia.</b> Each box's body-frame tensor is now rotated into the world frame, \(R\, I_{\text{body}}\, R^{\mathsf T}\), before the parallel-axis shift. Before, every box was treated as unrotated.</li>
+    <li><b>Panel mass.</b> Every panel got the mass of the default 1 × 1 m panel (27.1 kg). Now mass = area × 0.01 m × 2,710 kg/m³, so a 2 × 2 m wall weighs 108 kg.</li>
+    <li><b>Triangle and hexagon panels.</b> Top, bottom and shelf panels were bounding rectangles, so components could sit outside the shell. They are now polygons in the overlap test, area, mass and inertia, with a point-in-polygon on-panel check.</li>
+    <li><b>Thermal area.</b> The area counted the internal shelves. It now uses the outer shell only.</li>
+    <li><b>Shelf underside.</b> The frame was a reflection, \(\mathrm{diag}(1,1,-1)\) (determinant −1). It is now a 180° rotation.</li>
+  </ol>
+  <p>Also, <code>StructPanel</code> appended to a shared mutable default list, so panels from one design could leak into the next one evaluated.</p>
+</section>
+
+<section id="ppo" class="col">
+  <h2><span class="n">6</span>PPO fixes</h2>
+  <p>A correct PPO implementation has importance ratio \(\rho = \pi_\theta(a\mid s)/\pi_{\text{old}}(a\mid s) = 1\) for every action at the first update, since the weights have not moved. That was false here. The causes:</p>
+  <ol>
+    <li>The positional encoding was indexed by batch: <code>x</code> is batch-first, so the \(b\)-th design got \(\mathrm{PE}[b]\) on every token.</li>
+    <li>Dropout and AMP (fp16) were on during rollouts and updates.</li>
+    <li>The update gathered actor and critic outputs at the last padded position instead of each action's own step.</li>
+    <li>Returns were discounted by \(\gamma\lambda\) instead of \(\gamma\). For the first of 210 steps that gives \(0.949^{209} \approx 2\times10^{-5}\) instead of \(0.999^{209} \approx 0.81\).</li>
+    <li>Panel log-probabilities were not renormalized over the valid panels, and the mask was built for the wrong component.</li>
+    <li>The repair agent's pointer could reach only indices 0–9, and it stored the post-edit state as the observation.</li>
+    <li>Continuous values were decoded by integer truncation to 0, so every dimension edit gave 0.01 m. This also affected the intelligent-mutation GAs.</li>
+  </ol>
+  <p>After the fixes, the mean \(\log\rho\) at the first update is 0. <code>legacy_ppo</code> restores the old behavior for comparison. Even fixed, synthesis PPO finds no feasible design in 16,000 evaluations, with our settings or the IDETC paper's. Starting from random designs, it gets reward only from the overlap fraction and never sees a feasible layout.</p>
+</section>
+
+<section id="methods" class="col">
+  <h2><span class="n">7</span>Methods we added</h2>
+  <ul>
+    <li><b>Constructor</b> (<code>utils/construct.py</code>). Draw a random structure, then place the components one at a time in random order, each at a random clear spot (up to 500 tries). If a component does not fit, draw a new structure (up to 20). Every design it returns is feasible.</li>
+    <li><b>Overlap repair.</b> Find every component that overlaps something, is off its panel or has a blocked keep-out rod. Keep the rest fixed and re-place those at random clear spots (20 tries each).</li>
+    <li><b>Component mutation.</b> Redraw all 5 genes of one random component: a valid panel, position, face and rotation.</li>
+    <li><b>Structure mutation.</b> After component mutation, with probability 0.2, redraw one of the 5 structure genes; repair then fixes what this breaks. Component mutation and crossover almost never change the structure genes, so without this the population collapses to 1–4 structures within a few hundred evaluations.</li>
+    <li><b>Immigrants.</b> With probability 0.2, a child is replaced by a newly constructed design. The 8 elites are never replaced.</li>
+    <li><b>Oracle</b> (diagnostic). Try 8 component mutations and keep the one adding the most HV to the archive. "Free" does not count the 8 lookahead evaluations. It is an upper bound for a learned mutation operator.</li>
+    <li><b>greedy4.</b> The constructor, but each component takes the best of 4 clear candidates under a random objective weighting of partial costs.</li>
+    <li><b>Constructive PPO</b> (<code>optimization/construct_ppo.py</code>).
+      <ul>
+        <li>A policy picks the structure out of 8 random ones, then each placement out of 4 clear candidates. Every evaluated design is feasible.</li>
+        <li>The policy is a small MLP that scores candidates from hand-made features, conditioned on random objective weights. It starts from greedy4's rule (a fixed prior) and learns a correction.</li>
+        <li>16 designs share a weight vector and are ranked against each other, followed by a clipped PPO-style update.</li>
+      </ul>
+    </li>
+    <li><b>Warm start.</b> The IDETC paper's best method with our policy: the GA's initial 64 designs are sampled from the trained constructive PPO policy.</li>
+  </ul>
+</section>
+
+<section id="results" class="col">
+  <h2><span class="n">8</span>Further results</h2>
+  <h3>Budget</h3>
+  <figure>
+    <img src="figs/hv_vs_evaluations.png" alt="Two line charts of hypervolume against evaluations with shaded standard deviation bands. Left: 500 to 16,000 evaluations for six methods. Right: 500 to 64,000 for structure mutation, reaching 0.813, and the plain GA, reaching 0.796.">
+    <figcaption><b>Figure 7.</b> HV against evaluations. Lines are means and bands are ±1 SD across seeds. Left: the r6 runs (seeds 4–9), with greedy4 and constructed sampling from the timing runs (seeds 0–1). Right: 64,000-evaluation runs, seeds 0–3.</figcaption>
+  </figure>
+  <div class="tbl">
+  <table>
+    <thead><tr><th>Method</th><th class="num">HV at 64,000 (4 seeds)</th><th class="num">Minutes for 64,000</th><th class="num">Minutes for 16,000</th></tr></thead>
+    <tbody>
+      <tr><td>GA + structure mutation</td><td class="num">0.813 ± 0.012</td><td class="num">26–44</td><td class="num">7–12</td></tr>
+      <tr><td>GA + immigrants</td><td class="num">0.810 ± 0.006</td><td class="num">about 120*</td><td class="num">19–21</td></tr>
+      <tr><td>GA, constructed start + repair</td><td class="num">0.796 ± 0.003</td><td class="num">16–32</td><td class="num">4–8</td></tr>
+      <tr><td>Constructed sampling</td><td class="num">0.783 ± 0.005</td><td class="num">about 520*</td><td class="num">82</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p style="font-size:14.5px;color:var(--muted)">* Measured on a loaded machine.</p>
+  <h3>Wall-clock time</h3>
+  <p>An evaluation takes about 4 ms, a constructed design about 0.4 s and a greedy4 design about 1.4 s, so methods that construct a lot are slower for the same evaluation count. Per minute, structure mutation is the best method. The plain GA run 4× longer (64,000 evaluations, about 20 minutes) scores 0.796, about what immigrants reach at 16,000 in the same time.</p>
+  <figure>
+    <img src="figs/hv_vs_time.png" alt="Hypervolume against minutes on a log scale for six methods, one line per seed. Structure mutation reaches about 0.79 in about 10 minutes; greedy4 and constructed sampling take 80 to 230 minutes.">
+    <figcaption><b>Figure 8.</b> HV against wall-clock minutes at checkpoints from 500 to 16,000 evaluations, one line per seed (2 seeds). The machine was shared with other jobs, so the times are rough.</figcaption>
+  </figure>
+  <h3>Constructive PPO</h3>
+  <figure>
+    <img src="figs/constructive_ppo.png" alt="Line chart of HV with learning minus HV with learning off, by evaluations: +0.005 at 2,000, +0.008 at 4,000, +0.011 at 8,000 and +0.005 at 16,000, with a shaded standard deviation band and thin per-seed lines.">
+    <figcaption><b>Figure 9.</b> Constructive PPO, learning on minus learning off (the same policy fixed at greedy4's rule), for 4 seeds. The thick line is the mean, the band is ±1 SD, and the thin lines are individual seeds. Paired p: 0.31, 0.10, 0.05 and 0.11.</figcaption>
+  </figure>
+  <p>The learned policy picks smaller structures (median front volume 0.47 m³ against 0.59 m³ with learning off). At 16,000 evaluations it scores 0.799, as high as any method on seeds 0–3. A run takes about 7 hours, against about 14 minutes for structure mutation, because 60–80% of builds hit a structure that cannot be filled. Starting from uniform choices instead of greedy4's rule learned nothing useful in 2,000 evaluations (0.750 against 0.758 with learning off). A learning rate of 3e-3 did worse than 1e-3 (+0.002 at 16,000).</p>
+  <h3>Warm start</h3>
+  <figure>
+    <img src="figs/warm_start.png" alt="Two line charts of hypervolume against evaluations with standard deviation bands for constructed, learned-policy and learning-off starts. Policy starts lead by about 0.03 at 500 evaluations and the lead is gone by 16,000.">
+    <figcaption><b>Figure 10.</b> The GA started from 64 designs sampled from the trained policy (learned-policy), from the same policy with learning off, or from the constructor. 4 seeds; bands are ±1 SD. Policy starts lead by about 0.03 at 500 evaluations, and the lead is gone by 16,000. The learned and learning-off starts do not differ.</figcaption>
+  </figure>
+  <p>The IDETC paper's GA started from random designs, which were mostly infeasible even on that code, so any decent start helped. Here the GA already starts from feasible constructed designs.</p>
+  <h3>Transfer to new component lists</h3>
+  <figure>
+    <img src="figs/structure_transfer.png" alt="Bar charts with standard deviation error bars and seed dots of HV at 8,000 evaluations on two new component lists. Pools of structures raise GA plus immigrants from about 0.784 to 0.80 to 0.807, and constructed sampling from about 0.778 to 0.795.">
+    <figcaption><b>Figure 11.</b> Pools of structures reused on two randomly varied component lists, at 8,000 evaluations with 4 seeds. Bars are means with ±1 SD error bars, and dots are seeds.
+      <ul>
+        <li>Front pool: the 34 structures on the default list's fronts.</li>
+        <li>Matched pool: the same shell type, shelf count and volume, with random proportions.</li>
+        <li>Volume-only pool: the same volume, everything else random.</li>
+      </ul>
+    </figcaption>
+  </figure>
+  <p>Reusing structures gains about +0.02 (4 of 4 seeds on each list). But the matched pool does as well as the front structures, and volume alone gets most of the gain. What transfers is "smaller structures of a sensible type", not the front structures themselves. Front structures are about half the volume of uniformly sampled ones (median 0.55 against 1.15 m³).</p>
+  <h3>Other results</h3>
+  <ul>
+    <li>Immigrant rate: 0.1, 0.2, 0.35 and 0.5 give 0.786, 0.795, 0.793 and 0.784 (seeds 0–3). Immigrants plus structure mutation together give 0.788.</li>
+    <li>No gain from: 32 elites instead of 8 (0.771), local position moves (0.771), 4 restarts (0.779), a greedy initial population (0.788), or greedy immigrants (0.795, the same as plain immigrants at several times the cost).</li>
+    <li>Capping shell size at 1.2 or 1.5 m does not help the GAs. It helps constructed sampling (0.784 against 0.772, 4 of 4 seeds), at about 4× the time.</li>
+    <li>Headroom: pooling the final fronts of all 208 runs on the default list gives HV 0.832. The best single run reaches 0.821, and structure mutation reaches 0.813 at 64,000 evaluations.</li>
+  </ul>
+</section>
+
+<section id="next" class="col">
+  <h2><span class="n">9</span>Conclusions and proposals</h2>
+  <ul>
+    <li>The IDETC comparison was made on a constraint that missed most overlaps, and no design any of its methods produced is feasible. RL looked effective there partly because random designs were often "feasible", so a policy got a feasible signal from the start. On the corrected test it gets none.</li>
+    <li>On the corrected evaluator, feasibility by construction plus repair is what makes any method work. After that, the gains come from structure diversity, because thermal depends only on the shell area, and mass and inertia depend heavily on shell size.</li>
+    <li>On one fixed, cheap problem, a GA with structure mutation is hard to beat. Constructive PPO ties it per evaluation and loses per minute.</li>
+    <li>RL looks worthwhile in two settings we have not tested: an expensive evaluator, where evaluations matter more than minutes, or many component lists, where one trained policy designs new spacecraft quickly.
+      <ul>
+        <li>The proposed next test: constructive PPO trained across many component lists, scored on unseen lists, against a GA run from scratch on each.</li>
+        <li>The transfer results above set the non-learned bar: sampling smaller structures already gains +0.02.</li>
+      </ul>
+    </li>
+    <li>A thermal model that depends on component placement would change this picture, since layout would matter more and structure less.</li>
+  </ul>
+</section>
+
+<section id="questions" class="col">
+  <h2><span class="n">10</span>Questions</h2>
+  <ol>
+    <li>Do you agree with the overlap analysis and the IDETC re-check? How would you like to handle the IDETC results?</li>
+    <li>Is <code>ab59dbe</code>'s test the one you consider correct?</li>
+    <li>Do the six geometry fixes in section 5 match what you intended?</li>
+    <li>Which thermal model would you like? Should component placement affect it?</li>
+    <li>Which setting is the goal: one fixed problem, many component lists, or an expensive evaluator later?</li>
+    <li>Is feasibility by construction acceptable, or should the policy learn the no-overlap constraint itself?</li>
+    <li>Should we run the four IDETC methods not yet run on the corrected evaluator (section 4)?</li>
+    <li>How would you like the code: a branch, a pull request, or a summary first?</li>
+  </ol>
+</section>
+
+<section id="repro" class="col">
+  <h2><span class="n">11</span>Reproducing</h2>
+  <ul>
+    <li>All code is on a local branch (<code>experiments</code>), not pushed yet.</li>
+    <li>Runs: <code>experiments/runner.py</code> with arm files in <code>experiments/arms/</code>. HV: <code>experiments/summarize_raw.py</code>. Figures: <code>experiments/make_figures.py</code>.</li>
+    <li>Overlap probes: <code>experiments/probes/</code>, including <code>old_overlap_test.py</code> and the per-commit random feasibility counts.</li>
+    <li>IDETC rerun: <code>experiments/probes/idetc/run_idetc.py SEED OUTDIR</code> (run from a worktree of <code>110a859</code>), then <code>recheck_idetc.py</code> (corrected test, overlap counts and depths) and <code>render_overlaps.py</code> (3D pictures). The summary is in <code>experiments/data/idetc_recheck.json</code>.</li>
+    <li>Reference point: <code>experiments/reference/random_1.5.npy</code>. Every number in this report: <code>experiments/RESULTS.md</code>.</li>
+  </ul>
+</section>
+
+<footer class="col">Oliver Fan · rl_moo spacecraft configuration · October 2026</footer>
+</main>

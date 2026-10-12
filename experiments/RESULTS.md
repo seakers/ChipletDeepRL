@@ -146,3 +146,30 @@ unchanged (a random 2,000 where there were more).
 The deepest component overlap is typically 7-10 cm for the GAs and 18-26 cm for the PPO-based
 methods, which pile components together. Figures: `figures/idetc_*.png`, from
 `make_figures.py` and `probes/idetc/render_overlaps.py`.
+
+## IDETC-paper methods on the corrected evaluator (round 1, `cpu`, `gpu`)
+
+Round 1 records store fronts normalized by `reference/feasible.npy`; `make_figures.r1` rescales
+them and scores them on the IDETC reference. 8 seeds (0-7), mean ± 1 SD.
+
+| Arm | HV |
+|---|---|
+| `random` | no feasible design |
+| `ppo` (1 seed) | no feasible design |
+| `ppo_repair` (3 seeds) | 0.613 ± 0.050 |
+| `lab` (rl_moo GA: pygad, per-gene mutation 0.1) | 0.356 ± 0.036 |
+| `lab_construct` | 0.706 ± 0.015 |
+| `lab_repair` | 0.751 ± 0.004 |
+| `lab_construct_repair` | 0.750 ± 0.003 |
+| `nsga3` | 0.401 ± 0.044 |
+| `comp` | 0.478 ± 0.068 |
+| `comp_construct` | 0.739 ± 0.023 |
+| `comp_repair` | 0.759 ± 0.015 |
+| `comp_construct_repair` | 0.779 ± 0.012 |
+| `immig_0.2` | 0.793 ± 0.005 |
+| `struct_0.2` | 0.788 ± 0.009 |
+| `construct_only` | 0.770 ± 0.003 |
+
+Design repair PPO, warm-start GA and the intelligent-mutation GAs were not run on the corrected
+evaluator. Figures `methods_16k.png` and `old_vs_new.png`; the report for Alex is
+`report/index.html`.

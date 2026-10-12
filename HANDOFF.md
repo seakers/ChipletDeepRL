@@ -30,11 +30,13 @@ has the meeting notes and change log; this file has the context, rules and mista
 
 - Plan doc (Claude Doc): https://claude.ai/code/artifact/8a9fb288-e4dc-4211-abbe-f77b65f262ad.
   Project `8a9fb288-e4dc-4211-abbe-f77b65f262ad`. Main tab file `9e8da4a0-b25a`, body node
-  `ef992469-1fa3`: Meeting with Alex section at the top (his answers, what 110a859 has, the
-  IDETC rerun table, 10 questions, results to have ready), What we changed and why (short,
-  links to the explainer), older round sections, Running now, To do, Change log (newest first).
+  `ef992469-1fa3`, reorganized Oct 12: Meeting with Alex (his answers, what 110a859 has, 10
+  questions each with a reason, what to bring), All results by topic (short version, then
+  sections 1-9), What we changed and why, Status and next (running, to do, dropped), Lab
+  notebook (dated Oct 5-7 notes and charts), Change log (newest first). Put new results in the
+  topic sections, not new dated sections.
   Second tab "Technical explainer": file `a28bb075-6f66`, body node `9367a2a5-905a`. Edits need
-  full ids (`m990xsc15ss.N`); read with `sinceRev` first (last rev seen: main 64, tab 9).
+  full ids (`m990xsc15ss.N`); read with `sinceRev` first (last rev seen: main 68, tab 9).
 - Technical Notes page (HTML artifact, private, Oliver shares it):
   https://claude.ai/artifact/WUkcZpL3eq1uHTmeuNy8Wg. Parts 1-7 explain the problem, the overlap
   bug, each fix and each method from the basics up with MathJax and interactive figures; part 8
